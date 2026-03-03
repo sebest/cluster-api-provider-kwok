@@ -25,6 +25,7 @@ func (s *Service) Reconcile(ctx context.Context) (ctrl.Result, error) {
 	logger.Info("Reconciling KwokControlPlane")
 
 	kwokctlConfiguration := config.GetKwokctlConfiguration(ctx)
+	kwokctlConfiguration.Options.Runtime = s.scope.Runtime()
 
 	buildRuntime, ok := runtime.DefaultRegistry.Get(s.scope.Runtime())
 	if !ok {
