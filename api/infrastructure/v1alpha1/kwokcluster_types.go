@@ -61,6 +61,10 @@ type KwokClusterStatus struct {
 	// +kubebuilder:default=false
 	Ready bool `json:"ready"`
 
+	// Initialization provides observations of the KwokCluster initialization.
+	// +optional
+	Initialization KwokClusterInitializationStatus `json:"initialization,omitempty"`
+
 	// Conditions defines current service state of the KwokCluster.
 	// +optional
 	Conditions clusterv1.Conditions `json:"conditions,omitempty"`
@@ -71,6 +75,14 @@ type KwokClusterStatus struct {
 	// LastReconcileTime is the duration of the last reconcile loop.
 	//+optional
 	LastReconcileDuration time.Duration `json:"lastreconcileduration,omitempty"`
+}
+
+// KwokClusterInitializationStatus provides observations of the KwokCluster initialization.
+type KwokClusterInitializationStatus struct {
+	// Provisioned is true when the infrastructure provider reports that the
+	// cluster's infrastructure has been fully provisioned.
+	// +optional
+	Provisioned *bool `json:"provisioned,omitempty"`
 }
 
 //+kubebuilder:object:root=true

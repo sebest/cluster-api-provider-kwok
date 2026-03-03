@@ -76,6 +76,16 @@ spec:
           status:
             description: KwokControlPlaneStatus defines the observed state of KwokControlPlane
             properties:
+              initialization:
+                description: Initialization provides observations of the KwokControlPlane
+                  initialization.
+                properties:
+                  controlPlaneInitialized:
+                    description: |-
+                      ControlPlaneInitialized is true when the control plane is fully initialized
+                      and ready to provision machines.
+                    type: boolean
+                type: object
               initialized:
                 description: |-
                   Initialized denotes whether or not the control plane has the

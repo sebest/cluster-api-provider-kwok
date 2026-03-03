@@ -168,6 +168,16 @@ spec:
                   - name
                   type: object
                 type: array
+              initialization:
+                description: Initialization provides observations of the KwokCluster
+                  initialization.
+                properties:
+                  provisioned:
+                    description: |-
+                      Provisioned is true when the infrastructure provider reports that the
+                      cluster's infrastructure has been fully provisioned.
+                    type: boolean
+                type: object
               lastreconcileduration:
                 description: LastReconcileTime is the duration of the last reconcile
                   loop.

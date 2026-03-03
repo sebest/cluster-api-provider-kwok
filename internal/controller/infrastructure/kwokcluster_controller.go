@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/cluster-api/util"
 	"sigs.k8s.io/cluster-api/util/annotations"
 	"sigs.k8s.io/cluster-api/util/patch"
@@ -124,6 +125,7 @@ func (r *KwokClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	// Set the values from the managed control plane
 	kwokCluster.Status.Ready = true
+	kwokCluster.Status.Initialization.Provisioned = ptr.To(true)
 	kwokCluster.Spec.ControlPlaneEndpoint = controlPlane.Spec.ControlPlaneEndpoint
 
 	if err := patchHelper.Patch(ctx, kwokCluster); err != nil {

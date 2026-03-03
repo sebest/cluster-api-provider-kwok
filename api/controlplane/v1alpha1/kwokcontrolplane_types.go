@@ -57,6 +57,18 @@ type KwokControlPlaneStatus struct {
 	// receive requests and that the VPC infra is ready.
 	// +kubebuilder:default=false
 	Ready bool `json:"ready"`
+
+	// Initialization provides observations of the KwokControlPlane initialization.
+	// +optional
+	Initialization KwokControlPlaneInitializationStatus `json:"initialization,omitempty"`
+}
+
+// KwokControlPlaneInitializationStatus provides observations of the KwokControlPlane initialization.
+type KwokControlPlaneInitializationStatus struct {
+	// ControlPlaneInitialized is true when the control plane is fully initialized
+	// and ready to provision machines.
+	// +optional
+	ControlPlaneInitialized *bool `json:"controlPlaneInitialized,omitempty"`
 }
 
 //+kubebuilder:object:root=true

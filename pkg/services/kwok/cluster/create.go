@@ -11,6 +11,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
 	"sigs.k8s.io/cluster-api/util/kubeconfig"
@@ -49,6 +50,7 @@ func (s *Service) Reconcile(ctx context.Context) (ctrl.Result, error) {
 		if ready {
 			logger.Info("Cluster is already ready")
 			s.scope.ControlPlane.Status.Initialized = true
+			s.scope.ControlPlane.Status.Initialization.ControlPlaneInitialized = ptr.To(true)
 			return ctrl.Result{}, nil
 		}
 		// Exists but not ready — try starting and requeue
