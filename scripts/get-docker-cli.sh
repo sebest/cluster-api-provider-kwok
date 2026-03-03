@@ -35,14 +35,14 @@ echo "Downloading docker"
 
 case "$arch" in \
     'amd64') \
-        url='https://download.docker.com/linux/static/stable/x86_64/docker-23.0.5.tgz'; 
-        ;; 
-    'arm') 
-        url='https://download.docker.com/linux/static/stable/armhf/docker-23.0.5.tgz'; 
+        url='https://download.docker.com/linux/static/stable/x86_64/docker-27.5.1.tgz';
+        ;;
+    'arm')
+        url='https://download.docker.com/linux/static/stable/armhf/docker-27.5.1.tgz';
         ;; \
-    'arm64') 
-        url='https://download.docker.com/linux/static/stable/aarch64/docker-23.0.5.tgz'; 
-        ;; 
+    'arm64')
+        url='https://download.docker.com/linux/static/stable/aarch64/docker-27.5.1.tgz';
+        ;;
     *) echo >&2 "error: unsupported 'docker.tgz' architecture ($arch)"; exit 1 ;; 
 esac;
 
@@ -59,18 +59,18 @@ rm docker.tgz;
 
 echo "Downloading docker compose"
 
-case "$arch" in 
-    'amd64') 
-        url='https://github.com/docker/compose/releases/download/v2.17.3/docker-compose-linux-x86_64'; 
-        sha256='6abb771a438b8ef82b0ff0ef0e2e404032699104c3c40c59cd174b56214876c3'; 
-        ;; 
-    'arm') 
-        url='https://github.com/docker/compose/releases/download/v2.17.3/docker-compose-linux-armv7'; 
-        sha256='72c26a8ab6a519bd9c645a314d6ed33ed694efeda3f787123806990124446fe8'; 
-        ;; 
-    'arm64') 
-        url='https://github.com/docker/compose/releases/download/v2.17.3/docker-compose-linux-aarch64'; 
-        sha256='07bdced6f502ab24b481f46aa6b205f97e2256e5cb11279648ac9c088220a38d'; 
+case "$arch" in
+    'amd64')
+        url='https://github.com/docker/compose/releases/download/v2.32.4/docker-compose-linux-x86_64';
+        sha256='ed1917fb54db184192ea9d0717bcd59e3662ea79db48bff36d3475516c480a6b';
+        ;;
+    'arm')
+        url='https://github.com/docker/compose/releases/download/v2.32.4/docker-compose-linux-armv7';
+        sha256='c12bb3c23db5c409a15dbb13be4b61faa74c881d5db5f8a2816f60c19c35251a';
+        ;;
+    'arm64')
+        url='https://github.com/docker/compose/releases/download/v2.32.4/docker-compose-linux-aarch64';
+        sha256='0c4591cf3b1ed039adcd803dbbeddf757375fc08c11245b0154135f838495a2f';
         ;; 
     *) echo >&2 "warning: unsupported 'docker-compose' architecture ($arch); skipping"; exit 0 ;; 
 esac;

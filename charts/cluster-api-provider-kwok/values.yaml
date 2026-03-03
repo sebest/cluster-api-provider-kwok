@@ -17,6 +17,12 @@ leaderElect: true
 metricsBindAddr: "localhost:8080"
 healthAddr: ":9440"
 
+# Mount the Docker socket from the host so the KWOK docker runtime
+# can create simulated clusters via Docker Compose.
+dockerSocket:
+  enabled: true
+  hostPath: /var/run/docker.sock
+
 serviceAccount:
   create: true
   name: ""

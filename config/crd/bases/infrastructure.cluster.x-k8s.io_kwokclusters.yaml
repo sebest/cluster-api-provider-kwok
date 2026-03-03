@@ -76,7 +76,7 @@ spec:
                     type: object
                 type: object
               workingDir:
-                default: /kwok
+                default: /tmp/kwok
                 description: WorkingDir is the directory to use for the kwok runtime.
                   If using kind you will need to mount this as an extra volume.
                 type: string

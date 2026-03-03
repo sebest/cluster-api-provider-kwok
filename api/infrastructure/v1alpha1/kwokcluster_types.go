@@ -42,7 +42,7 @@ type KwokClusterSpec struct {
 
 	// WorkingDir is the directory to use for the kwok runtime. If using kind
 	// you will need to mount this as an extra volume.
-	// +kubebuilder:default=/kwok
+	// +kubebuilder:default=/tmp/kwok
 	WorkingDir string `json:"workingDir,omitempty"`
 
 	// ControlPlaneEndpoint represents the endpoint used to communicate with the control plane.

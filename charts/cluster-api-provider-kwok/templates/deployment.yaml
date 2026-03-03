@@ -28,6 +28,8 @@ spec:
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         env:
+        - name: HOME
+          value: /tmp
         - name: POD_NAMESPACE
           valueFrom:
             fieldRef:
@@ -54,13 +56,40 @@ spec:
             port: healthz
         resources:
           {{- toYaml .Values.resources | nindent 10 }}
+        {{- if .Values.dockerSocket.enabled }}
+        securityContext:
+          runAsUser: 0
+        volumeMounts:
+        - name: docker-sock
+          mountPath: /var/run/docker.sock
+        - name: kwok-workdir
+          mountPath: /tmp/kwok
+        - name: kwok-cache
+          mountPath: /tmp/.kwok
+        {{- else }}
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
             drop:
             - "ALL"
+        {{- end }}
       serviceAccountName: {{ include "cluster-api-provider-kwok.serviceAccountName" . }}
       terminationGracePeriodSeconds: 10
+      {{- if .Values.dockerSocket.enabled }}
+      volumes:
+      - name: docker-sock
+        hostPath:
+          path: {{ .Values.dockerSocket.hostPath }}
+          type: Socket
+      - name: kwok-workdir
+        hostPath:
+          path: /tmp/kwok
+          type: DirectoryOrCreate
+      - name: kwok-cache
+        hostPath:
+          path: /tmp/.kwok
+          type: DirectoryOrCreate
+      {{- end }}
       {{- with .Values.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
