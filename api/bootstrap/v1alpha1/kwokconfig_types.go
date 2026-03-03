@@ -39,6 +39,26 @@ type KwokConfigStatus struct {
 	// LastReconcileTime is the duration of the last reconcile loop.
 	//+optional
 	LastReconcileDuration time.Duration `json:"lastreconcileduration,omitempty"`
+
+	// Ready indicates the bootstrap data has been generated and the
+	// DataSecretName field is set.
+	// +optional
+	Ready bool `json:"ready"`
+
+	// DataSecretName is the name of the secret that stores the bootstrap data.
+	// +optional
+	DataSecretName *string `json:"dataSecretName,omitempty"`
+
+	// Initialization provides observations of the KwokConfig initialization.
+	// +optional
+	Initialization KwokConfigInitializationStatus `json:"initialization,omitempty"`
+}
+
+// KwokConfigInitializationStatus provides observations of the KwokConfig initialization.
+type KwokConfigInitializationStatus struct {
+	// DataSecretCreated is true when the Machine's bootstrap secret is created.
+	// +optional
+	DataSecretCreated *bool `json:"dataSecretCreated,omitempty"`
 }
 
 //+kubebuilder:object:root=true

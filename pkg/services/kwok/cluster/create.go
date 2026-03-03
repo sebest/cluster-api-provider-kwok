@@ -49,8 +49,14 @@ func (s *Service) Reconcile(ctx context.Context) (ctrl.Result, error) {
 		}
 		if ready {
 			logger.Info("Cluster is already ready")
+			s.scope.ControlPlane.Status.Ready = true
 			s.scope.ControlPlane.Status.Initialized = true
 			s.scope.ControlPlane.Status.Initialization.ControlPlaneInitialized = ptr.To(true)
+
+			if err := s.reconcileKubeconfig(ctx, rt); err != nil {
+				return ctrl.Result{}, fmt.Errorf("reconciling kubeconfig: %w", err)
+			}
+
 			return ctrl.Result{}, nil
 		}
 		// Exists but not ready — try starting and requeue

@@ -52,7 +52,7 @@ import (
 	controlplanev1 "github.com/capi-samples/cluster-api-provider-kwok/api/controlplane/v1alpha1"
 	infrav1 "github.com/capi-samples/cluster-api-provider-kwok/api/infrastructure/v1alpha1"
 
-	//bootstrapcontroller "github.com/capi-samples/cluster-api-provider-kwok/internal/controller/bootstrap"
+	bootstrapcontroller "github.com/capi-samples/cluster-api-provider-kwok/internal/controller/bootstrap"
 	controlplanecontroller "github.com/capi-samples/cluster-api-provider-kwok/internal/controller/controlplane"
 	infracontroller "github.com/capi-samples/cluster-api-provider-kwok/internal/controller/infrastructure"
 	"github.com/capi-samples/cluster-api-provider-kwok/pkg/consts"
@@ -248,11 +248,11 @@ func setupReconcilers(ctx context.Context, mgr ctrl.Manager) {
 		setupLog.Error(err, "unable to create controller", "controller", "KwokControlPlane")
 		os.Exit(1)
 	}
-	// if err := (&bootstrapcontroller.KwokConfigReconciler{
-	// 	Client: mgr.GetClient(),
-	// 	Scheme: mgr.GetScheme(),
-	// }).SetupWithManager(mgr); err != nil {
-	// 	setupLog.Error(err, "unable to create controller", "controller", "KwokConfig")
-	// 	os.Exit(1)
-	// }
+	if err := (&bootstrapcontroller.KwokConfigReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "KwokConfig")
+		os.Exit(1)
+	}
 }

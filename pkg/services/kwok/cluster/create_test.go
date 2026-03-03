@@ -33,6 +33,7 @@ func TestServiceReconcile(t *testing.T) {
 		wantErr        bool
 		errContains    string
 		initialized    bool
+		wantReady      bool
 		wantRequeue    bool
 		upCalled       bool
 		installCalled  bool
@@ -71,6 +72,7 @@ func TestServiceReconcile(t *testing.T) {
 			}),
 			wantErr:     false,
 			initialized: true,
+			wantReady:   true,
 			upCalled:    false,
 		},
 		{
@@ -256,6 +258,7 @@ func TestServiceReconcile(t *testing.T) {
 			} else {
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(scope.ControlPlane.Status.Initialized).To(Equal(tt.initialized))
+				g.Expect(scope.ControlPlane.Status.Ready).To(Equal(tt.wantReady))
 				if tt.wantRequeue {
 					g.Expect(result.RequeueAfter).To(Equal(5 * time.Second))
 				}
