@@ -56,7 +56,7 @@ spec:
                 - port
                 type: object
               runtime:
-                default: docker
+                default: binary
                 description: Runtime is the kwok runtime to use.
                 type: string
               simulationConfig:

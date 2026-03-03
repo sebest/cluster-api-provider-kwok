@@ -181,6 +181,14 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Unset Kubernetes service discovery env vars so that KWOK binary runtime
+	// spawned processes (etcd, kube-apiserver, etc.) don't discover the host
+	// cluster. The controller-runtime manager has already cached the in-cluster
+	// config at this point. See: https://kwok.sigs.k8s.io/docs/user/all-in-one-image/#use-in-a-pod
+	os.Unsetenv("KUBERNETES_SERVICE_HOST")
+	os.Unsetenv("KUBERNETES_SERVICE_PORT")
+	os.Unsetenv("KUBERNETES_SERVICE_PORT_HTTPS")
+
 	setupProbes(mgr)
 	setupReconcilers(ctx, mgr)
 	//setupWebhooks(mgr)

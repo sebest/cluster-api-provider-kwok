@@ -37,7 +37,7 @@ type KwokClusterSpec struct {
 	BindAddress string `json:"bindAddress,omitempty"`
 
 	// Runtime is the kwok runtime to use.
-	// +kubebuilder:default=docker
+	// +kubebuilder:default=binary
 	Runtime string `json:"runtime,omitempty"`
 
 	// WorkingDir is the directory to use for the kwok runtime. If using kind
