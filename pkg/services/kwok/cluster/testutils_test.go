@@ -3,6 +3,8 @@ package cluster
 import (
 	"context"
 	"io"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -198,6 +200,30 @@ func buildTestScope(t *testing.T) *scope.ControlPlaneScope {
 	scheme := testScheme()
 	logger := logr.Discard()
 
+	workDir := t.TempDir()
+
+	// Create a minimal kwok kubeconfig file so that createKubeconfigSecret
+	// can read it during the full reconcile flow.
+	kwokKubeconfig := `apiVersion: v1
+clusters:
+- cluster:
+    server: http://127.0.0.1:8080
+  name: test-cluster
+contexts:
+- context:
+    cluster: test-cluster
+    user: test-cluster
+  name: test-cluster
+current-context: test-cluster
+kind: Config
+users:
+- name: test-cluster
+  user: {}
+`
+	if err := os.WriteFile(filepath.Join(workDir, "kubeconfig.yaml"), []byte(kwokKubeconfig), 0o644); err != nil {
+		t.Fatalf("failed to create test kubeconfig: %v", err)
+	}
+
 	cluster := &clusterv1.Cluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-cluster",
@@ -211,7 +237,7 @@ func buildTestScope(t *testing.T) *scope.ControlPlaneScope {
 		},
 		Spec: infrav1.KwokClusterSpec{
 			Runtime:    "binary",
-			WorkingDir: "/tmp/kwok/test",
+			WorkingDir: workDir,
 		},
 	}
 	controlPlane := &controlplanev1.KwokControlPlane{

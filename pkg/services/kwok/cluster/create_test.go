@@ -3,7 +3,10 @@ package cluster
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/go-logr/logr"
 	. "github.com/onsi/gomega"
@@ -25,13 +28,14 @@ import (
 
 func TestServiceReconcile(t *testing.T) {
 	tests := []struct {
-		name          string
-		provider      *mockRuntimeProvider
-		wantErr       bool
-		errContains   string
-		initialized   bool
-		upCalled      bool
-		installCalled bool
+		name           string
+		provider       *mockRuntimeProvider
+		wantErr        bool
+		errContains    string
+		initialized    bool
+		wantRequeue    bool
+		upCalled       bool
+		installCalled  bool
 	}{
 		{
 			name: "runtime not found returns error",
@@ -56,7 +60,7 @@ func TestServiceReconcile(t *testing.T) {
 			errContains: "not available",
 		},
 		{
-			name: "cluster exists and ready returns early",
+			name: "cluster exists and ready sets initialized",
 			provider: newMockProviderWithRuntime(&mockRuntime{
 				configFn: func(_ context.Context) (*internalversion.KwokctlConfiguration, error) {
 					return &internalversion.KwokctlConfiguration{}, nil
@@ -66,13 +70,26 @@ func TestServiceReconcile(t *testing.T) {
 				},
 			}),
 			wantErr:     false,
-			initialized: false, // early return before setting initialized
+			initialized: true,
 			upCalled:    false,
 		},
 		{
-			name: "cluster exists but not ready calls Up",
+			name: "cluster exists but Ready errors requeues",
+			provider: newMockProviderWithRuntime(&mockRuntime{
+				configFn: func(_ context.Context) (*internalversion.KwokctlConfiguration, error) {
+					return &internalversion.KwokctlConfiguration{}, nil
+				},
+				readyFn: func(_ context.Context) (bool, error) {
+					return false, fmt.Errorf("healthz check failed")
+				},
+			}),
+			wantErr:     false,
+			initialized: false,
+			wantRequeue: true,
+		},
+		{
+			name: "cluster exists but not ready requeues",
 			provider: func() *mockRuntimeProvider {
-				upCalled := false
 				rt := &mockRuntime{
 					configFn: func(_ context.Context) (*internalversion.KwokctlConfiguration, error) {
 						return &internalversion.KwokctlConfiguration{
@@ -85,18 +102,17 @@ func TestServiceReconcile(t *testing.T) {
 						return false, nil
 					},
 					upFn: func(_ context.Context) error {
-						upCalled = true
-						_ = upCalled
 						return nil
 					},
 				}
 				return newMockProviderWithRuntime(rt)
 			}(),
 			wantErr:     false,
-			initialized: true,
+			initialized: false,
+			wantRequeue: true,
 		},
 		{
-			name: "new cluster create flow succeeds",
+			name: "new cluster create flow requeues for readiness",
 			provider: func() *mockRuntimeProvider {
 				callOrder := []string{}
 				configCallCount := 0
@@ -135,7 +151,8 @@ func TestServiceReconcile(t *testing.T) {
 				return newMockProviderWithRuntime(rt)
 			}(),
 			wantErr:     false,
-			initialized: true,
+			initialized: false,
+			wantRequeue: true,
 		},
 		{
 			name: "SetConfig failure returns error",
@@ -230,7 +247,7 @@ func TestServiceReconcile(t *testing.T) {
 			scope := buildTestScope(t)
 			svc := NewServiceWithProvider(scope, tt.provider)
 
-			_, err := svc.Reconcile(context.Background())
+			result, err := svc.Reconcile(context.Background())
 			if tt.wantErr {
 				g.Expect(err).To(HaveOccurred())
 				if tt.errContains != "" {
@@ -239,6 +256,9 @@ func TestServiceReconcile(t *testing.T) {
 			} else {
 				g.Expect(err).NotTo(HaveOccurred())
 				g.Expect(scope.ControlPlane.Status.Initialized).To(Equal(tt.initialized))
+				if tt.wantRequeue {
+					g.Expect(result.RequeueAfter).To(Equal(5 * time.Second))
+				}
 			}
 		})
 	}
@@ -268,6 +288,26 @@ func TestReconcileKubeconfig(t *testing.T) {
 			scheme := testScheme()
 			_ = corev1.AddToScheme(scheme)
 
+			workDir := t.TempDir()
+			// Create minimal kwok kubeconfig for the "secret not found creates it" test case
+			kwokKubeconfig := `apiVersion: v1
+clusters:
+- cluster:
+    server: http://127.0.0.1:6443
+  name: test-cluster
+contexts:
+- context:
+    cluster: test-cluster
+    user: test-cluster
+  name: test-cluster
+current-context: test-cluster
+kind: Config
+users:
+- name: test-cluster
+  user: {}
+`
+			g.Expect(os.WriteFile(filepath.Join(workDir, "kubeconfig.yaml"), []byte(kwokKubeconfig), 0o644)).To(Succeed())
+
 			cluster := &clusterv1.Cluster{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-cluster",
@@ -281,7 +321,7 @@ func TestReconcileKubeconfig(t *testing.T) {
 				},
 				Spec: infrav1.KwokClusterSpec{
 					Runtime:    "binary",
-					WorkingDir: "/tmp/kwok/test",
+					WorkingDir: workDir,
 				},
 			}
 			controlPlane := &controlplanev1.KwokControlPlane{
@@ -380,6 +420,41 @@ func TestCreateKubeconfigSecret(t *testing.T) {
 			Namespace: "default",
 		},
 	}
+
+	workDir := t.TempDir()
+	pkiDir := filepath.Join(workDir, "pki")
+	err := os.MkdirAll(pkiDir, 0o755)
+	g.Expect(err).NotTo(HaveOccurred())
+
+	caCert := []byte("fake-ca-cert")
+	adminCert := []byte("fake-admin-cert")
+	adminKey := []byte("fake-admin-key")
+	g.Expect(os.WriteFile(filepath.Join(pkiDir, "ca.crt"), caCert, 0o644)).To(Succeed())
+	g.Expect(os.WriteFile(filepath.Join(pkiDir, "admin.crt"), adminCert, 0o644)).To(Succeed())
+	g.Expect(os.WriteFile(filepath.Join(pkiDir, "admin.key"), adminKey, 0o600)).To(Succeed())
+
+	// Write a kwok-style kubeconfig that createKubeconfigSecret reads
+	kwokKubeconfig := `apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority: ` + filepath.Join(pkiDir, "ca.crt") + `
+    server: https://10.0.0.5:6443
+  name: test-cluster
+contexts:
+- context:
+    cluster: test-cluster
+    user: test-cluster
+  name: test-cluster
+current-context: test-cluster
+kind: Config
+users:
+- name: test-cluster
+  user:
+    client-certificate: ` + filepath.Join(pkiDir, "admin.crt") + `
+    client-key: ` + filepath.Join(pkiDir, "admin.key") + `
+`
+	g.Expect(os.WriteFile(filepath.Join(workDir, "kubeconfig.yaml"), []byte(kwokKubeconfig), 0o644)).To(Succeed())
+
 	kwokCluster := &infrav1.KwokCluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-kwok",
@@ -387,7 +462,7 @@ func TestCreateKubeconfigSecret(t *testing.T) {
 		},
 		Spec: infrav1.KwokClusterSpec{
 			BindAddress: "10.0.0.5",
-			WorkingDir:  "/tmp/kwok/test",
+			WorkingDir:  workDir,
 		},
 	}
 
@@ -400,15 +475,7 @@ func TestCreateKubeconfigSecret(t *testing.T) {
 		Logger:       &logger,
 	}
 
-	rt := &mockRuntime{
-		configFn: func(_ context.Context) (*internalversion.KwokctlConfiguration, error) {
-			return &internalversion.KwokctlConfiguration{
-				Options: internalversion.KwokctlConfigurationOptions{
-					KubeApiserverPort: 6443,
-				},
-			}, nil
-		},
-	}
+	rt := &mockRuntime{}
 
 	svc := NewServiceWithProvider(cpScope, newMockProviderWithRuntime(rt))
 
@@ -416,7 +483,7 @@ func TestCreateKubeconfigSecret(t *testing.T) {
 		Name:      "test-cluster",
 		Namespace: "default",
 	}
-	err := svc.createKubeconfigSecret(context.Background(), &clusterRef, rt)
+	err = svc.createKubeconfigSecret(context.Background(), &clusterRef, rt)
 	g.Expect(err).NotTo(HaveOccurred())
 
 	// Verify the secret was created
@@ -431,9 +498,14 @@ func TestCreateKubeconfigSecret(t *testing.T) {
 	// Parse the kubeconfig and verify its content
 	kubeconfigData := secret.Data["value"]
 	g.Expect(kubeconfigData).NotTo(BeEmpty())
-	g.Expect(string(kubeconfigData)).To(ContainSubstring("10.0.0.5"))
+	g.Expect(string(kubeconfigData)).To(ContainSubstring("https://10.0.0.5"))
 	g.Expect(string(kubeconfigData)).To(ContainSubstring("6443"))
 	g.Expect(string(kubeconfigData)).To(ContainSubstring("test-cluster"))
+
+	// Verify TLS cert data is embedded
+	g.Expect(string(kubeconfigData)).To(ContainSubstring("certificate-authority-data"))
+	g.Expect(string(kubeconfigData)).To(ContainSubstring("client-certificate-data"))
+	g.Expect(string(kubeconfigData)).To(ContainSubstring("client-key-data"))
 }
 
 func TestCreateKubeconfigSecret_CreateFails(t *testing.T) {
@@ -468,13 +540,34 @@ func TestCreateKubeconfigSecret_CreateFails(t *testing.T) {
 			Namespace: "default",
 		},
 	}
+
+	workDir := t.TempDir()
+	// Write a minimal kwok kubeconfig
+	kwokKubeconfig := `apiVersion: v1
+clusters:
+- cluster:
+    server: http://127.0.0.1:6443
+  name: test-cluster
+contexts:
+- context:
+    cluster: test-cluster
+    user: test-cluster
+  name: test-cluster
+current-context: test-cluster
+kind: Config
+users:
+- name: test-cluster
+  user: {}
+`
+	g.Expect(os.WriteFile(filepath.Join(workDir, "kubeconfig.yaml"), []byte(kwokKubeconfig), 0o644)).To(Succeed())
+
 	kwokCluster := &infrav1.KwokCluster{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-kwok",
 			Namespace: "default",
 		},
 		Spec: infrav1.KwokClusterSpec{
-			WorkingDir: "/tmp/kwok/test",
+			WorkingDir: workDir,
 		},
 	}
 
@@ -487,15 +580,7 @@ func TestCreateKubeconfigSecret_CreateFails(t *testing.T) {
 		Logger:       &logger,
 	}
 
-	rt := &mockRuntime{
-		configFn: func(_ context.Context) (*internalversion.KwokctlConfiguration, error) {
-			return &internalversion.KwokctlConfiguration{
-				Options: internalversion.KwokctlConfigurationOptions{
-					KubeApiserverPort: 6443,
-				},
-			}, nil
-		},
-	}
+	rt := &mockRuntime{}
 
 	svc := NewServiceWithProvider(cpScope, newMockProviderWithRuntime(rt))
 	clusterRef := types.NamespacedName{Name: "test-cluster", Namespace: "default"}
