@@ -340,6 +340,10 @@ test-cover: ## Run unit and integration tests and generate a coverage report
 kind-cluster: ## Create a new kind cluster with proxy workarounds for local dev
 	hack/kind-install.sh $(CAPI_KIND_CLUSTER_NAME)
 
+.PHONY: e2e-test
+e2e-test: ## Run end-to-end test (creates fresh kind cluster)
+	hack/e2e-test.sh
+
 .PHONY: tilt-up
 tilt-up: kind-cluster ## Start tilt and build kind cluster if needed.
 	tilt up

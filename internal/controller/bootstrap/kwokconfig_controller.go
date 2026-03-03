@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/ptr"
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
+	exputil "sigs.k8s.io/cluster-api/exp/util"
 	"sigs.k8s.io/cluster-api/util"
 	"sigs.k8s.io/cluster-api/util/annotations"
 	"sigs.k8s.io/cluster-api/util/patch"
@@ -48,6 +49,7 @@ type KwokConfigReconciler struct {
 //+kubebuilder:rbac:groups=bootstrap.cluster.x-k8s.io,resources=kwokconfigs/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=bootstrap.cluster.x-k8s.io,resources=kwokconfigs/finalizers,verbs=update
 //+kubebuilder:rbac:groups=cluster.x-k8s.io,resources=machines,verbs=get;list;watch
+//+kubebuilder:rbac:groups=cluster.x-k8s.io,resources=machinepools,verbs=get;list;watch
 //+kubebuilder:rbac:groups=cluster.x-k8s.io,resources=clusters,verbs=get;list;watch
 //+kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create
 
@@ -68,14 +70,26 @@ func (r *KwokConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		return ctrl.Result{}, err
 	}
 
-	// 2. Look up the owner Machine
+	// 2. Look up the owner — either a Machine or a MachinePool
 	machine, err := util.GetOwnerMachine(ctx, r.Client, kwokConfig.ObjectMeta)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	if machine == nil {
-		logger.Info("Waiting for Machine controller to set OwnerRef on KwokConfig")
-		return ctrl.Result{}, nil
+
+	// For MachinePool support: if no Machine owner, check for MachinePool
+	var clusterName string
+	if machine != nil {
+		clusterName = machine.Spec.ClusterName
+	} else {
+		machinePool, err := exputil.GetOwnerMachinePool(ctx, r.Client, kwokConfig.ObjectMeta)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		if machinePool == nil {
+			logger.Info("Waiting for controller to set OwnerRef on KwokConfig")
+			return ctrl.Result{}, nil
+		}
+		clusterName = machinePool.Spec.ClusterName
 	}
 
 	// 3. If DataSecretName is already set, nothing to do (idempotent)
@@ -84,7 +98,7 @@ func (r *KwokConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	// 4. Get the Cluster
-	cluster, err := util.GetClusterFromMetadata(ctx, r.Client, machine.ObjectMeta)
+	cluster, err := r.getCluster(ctx, kwokConfig.Namespace, clusterName)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -150,6 +164,10 @@ func (r *KwokConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			&clusterv1.Machine{},
 			handler.EnqueueRequestsFromMapFunc(r.machineToBootstrapConfig),
 		).
+		Watches(
+			&clusterv1.MachinePool{},
+			handler.EnqueueRequestsFromMapFunc(r.machinePoolToBootstrapConfig),
+		).
 		Complete(r)
 }
 
@@ -176,4 +194,40 @@ func (r *KwokConfigReconciler) machineToBootstrapConfig(ctx context.Context, o c
 			},
 		},
 	}
+}
+
+// machinePoolToBootstrapConfig maps MachinePool events to their bootstrap KwokConfig.
+func (r *KwokConfigReconciler) machinePoolToBootstrapConfig(ctx context.Context, o client.Object) []ctrl.Request {
+	machinePool, ok := o.(*clusterv1.MachinePool)
+	if !ok {
+		return nil
+	}
+
+	configRef := machinePool.Spec.Template.Spec.Bootstrap.ConfigRef
+	if !configRef.IsDefined() {
+		return nil
+	}
+
+	if configRef.APIGroup != bootstrapv1alpha1.GroupVersion.Group {
+		return nil
+	}
+
+	return []ctrl.Request{
+		{
+			NamespacedName: client.ObjectKey{
+				Namespace: machinePool.Namespace,
+				Name:      configRef.Name,
+			},
+		},
+	}
+}
+
+// getCluster fetches a Cluster by name from the given namespace.
+func (r *KwokConfigReconciler) getCluster(ctx context.Context, namespace, name string) (*clusterv1.Cluster, error) {
+	cluster := &clusterv1.Cluster{}
+	key := client.ObjectKey{Namespace: namespace, Name: name}
+	if err := r.Client.Get(ctx, key, cluster); err != nil {
+		return nil, err
+	}
+	return cluster, nil
 }

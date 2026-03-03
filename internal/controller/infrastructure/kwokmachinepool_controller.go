@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"time"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -249,6 +250,7 @@ func (r *KwokMachinePoolReconciler) reconcileNormal(
 
 	if !kwokMachinePool.Status.Ready {
 		log.Info("KwokMachinePool not yet ready", "desired", desiredReplicas, "current", len(childKwokMachines.Items), "allProvisioned", allProvisioned)
+		return reconcile.Result{RequeueAfter: 5 * time.Second}, nil
 	} else {
 		log.Info("KwokMachinePool is ready", "replicas", desiredReplicas)
 	}

@@ -264,3 +264,100 @@ func TestReconcile_HappyPath(t *testing.T) {
 	g.Expect(*updatedConfig.Status.DataSecretName).To(Equal("test-config-bootstrap-data"))
 	g.Expect(ptr.Deref(updatedConfig.Status.Initialization.DataSecretCreated, false)).To(BeTrue())
 }
+
+func TestReconcile_MachinePoolOwner(t *testing.T) {
+	g := NewWithT(t)
+	scheme := testScheme()
+
+	kwokConfig := &bootstrapv1.KwokConfig{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "pool-config",
+			Namespace: "default",
+			UID:       "pool-config-uid",
+			OwnerReferences: []metav1.OwnerReference{
+				{
+					APIVersion: clusterv1.GroupVersion.String(),
+					Kind:       "MachinePool",
+					Name:       "test-pool",
+					UID:        "pool-uid",
+				},
+			},
+		},
+	}
+
+	cluster := &clusterv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: "default",
+		},
+	}
+
+	machinePool := &clusterv1.MachinePool{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pool",
+			Namespace: "default",
+			Labels: map[string]string{
+				clusterv1.ClusterNameLabel: "test-cluster",
+			},
+		},
+		Spec: clusterv1.MachinePoolSpec{
+			ClusterName: "test-cluster",
+			Template: clusterv1.MachineTemplateSpec{
+				Spec: clusterv1.MachineSpec{
+					ClusterName: "test-cluster",
+					Bootstrap: clusterv1.Bootstrap{
+						ConfigRef: clusterv1.ContractVersionedObjectReference{
+							Kind:     "KwokConfig",
+							Name:     "pool-config",
+							APIGroup: bootstrapv1.GroupVersion.Group,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(kwokConfig, cluster, machinePool).
+		WithStatusSubresource(kwokConfig).
+		Build()
+
+	r := &KwokConfigReconciler{
+		Client: fakeClient,
+		Scheme: scheme,
+	}
+
+	ctx := log.IntoContext(context.Background(), logr.Discard())
+	result, err := r.Reconcile(ctx, ctrl.Request{
+		NamespacedName: types.NamespacedName{
+			Name:      "pool-config",
+			Namespace: "default",
+		},
+	})
+
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(result).To(Equal(ctrl.Result{}))
+
+	// Verify the secret was created
+	secret := &corev1.Secret{}
+	err = fakeClient.Get(context.Background(), types.NamespacedName{
+		Name:      "pool-config-bootstrap-data",
+		Namespace: "default",
+	}, secret)
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(secret.Data).To(HaveKey("value"))
+	g.Expect(secret.Labels).To(HaveKeyWithValue(clusterv1.ClusterNameLabel, "test-cluster"))
+
+	// Verify the KwokConfig status was updated
+	updatedConfig := &bootstrapv1.KwokConfig{}
+	err = fakeClient.Get(context.Background(), types.NamespacedName{
+		Name:      "pool-config",
+		Namespace: "default",
+	}, updatedConfig)
+	g.Expect(err).NotTo(HaveOccurred())
+	g.Expect(updatedConfig.Status.Ready).To(BeTrue())
+	g.Expect(updatedConfig.Status.DataSecretName).NotTo(BeNil())
+	g.Expect(*updatedConfig.Status.DataSecretName).To(Equal("pool-config-bootstrap-data"))
+	g.Expect(ptr.Deref(updatedConfig.Status.Initialization.DataSecretCreated, false)).To(BeTrue())
+}

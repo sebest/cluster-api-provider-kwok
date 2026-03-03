@@ -154,6 +154,7 @@ func (r *KwokMachineReconciler) reconcileNormal(
 
 	// Create a Node object in the workload cluster
 	nodeName := machine.Name
+	providerID := fmt.Sprintf("kwok:////%s", nodeName)
 	node := &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: nodeName,
@@ -163,6 +164,9 @@ func (r *KwokMachineReconciler) reconcileNormal(
 			Labels: map[string]string{
 				"type": "kwok",
 			},
+		},
+		Spec: corev1.NodeSpec{
+			ProviderID: providerID,
 		},
 	}
 
@@ -174,7 +178,6 @@ func (r *KwokMachineReconciler) reconcileNormal(
 	}
 
 	// Set the ProviderID
-	providerID := fmt.Sprintf("kwok:////%s", nodeName)
 	kwokMachine.Spec.ProviderID = providerID
 
 	// Set status

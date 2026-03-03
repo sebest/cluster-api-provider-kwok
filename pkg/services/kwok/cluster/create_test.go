@@ -501,6 +501,7 @@ users:
 	// Parse the kubeconfig and verify its content
 	kubeconfigData := secret.Data["value"]
 	g.Expect(kubeconfigData).NotTo(BeEmpty())
+	// Server has non-loopback address, so no rewrite expected
 	g.Expect(string(kubeconfigData)).To(ContainSubstring("https://10.0.0.5"))
 	g.Expect(string(kubeconfigData)).To(ContainSubstring("6443"))
 	g.Expect(string(kubeconfigData)).To(ContainSubstring("test-cluster"))
@@ -509,6 +510,102 @@ users:
 	g.Expect(string(kubeconfigData)).To(ContainSubstring("certificate-authority-data"))
 	g.Expect(string(kubeconfigData)).To(ContainSubstring("client-certificate-data"))
 	g.Expect(string(kubeconfigData)).To(ContainSubstring("client-key-data"))
+
+	// Verify ControlPlaneEndpoint was set
+	g.Expect(controlPlane.Spec.ControlPlaneEndpoint.Host).To(Equal("10.0.0.5"))
+	g.Expect(controlPlane.Spec.ControlPlaneEndpoint.Port).To(Equal(int32(6443)))
+}
+
+func TestCreateKubeconfigSecret_PodIPRewrite(t *testing.T) {
+	g := NewWithT(t)
+	scheme := testScheme()
+	_ = corev1.AddToScheme(scheme)
+
+	controlPlane := &controlplanev1.KwokControlPlane{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cp",
+			Namespace: "default",
+			UID:       "test-uid",
+		},
+	}
+
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(controlPlane).
+		Build()
+
+	cluster := &clusterv1.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-cluster",
+			Namespace: "default",
+		},
+	}
+
+	workDir := t.TempDir()
+
+	// Write a kwok kubeconfig with loopback address (127.0.0.1)
+	kwokKubeconfig := `apiVersion: v1
+clusters:
+- cluster:
+    server: https://127.0.0.1:6443
+  name: test-cluster
+contexts:
+- context:
+    cluster: test-cluster
+    user: test-cluster
+  name: test-cluster
+current-context: test-cluster
+kind: Config
+users:
+- name: test-cluster
+  user: {}
+`
+	g.Expect(os.WriteFile(filepath.Join(workDir, "kubeconfig.yaml"), []byte(kwokKubeconfig), 0o644)).To(Succeed())
+
+	kwokCluster := &infrav1.KwokCluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-kwok",
+			Namespace: "default",
+		},
+		Spec: infrav1.KwokClusterSpec{
+			WorkingDir: workDir,
+		},
+	}
+
+	logger := logr.Discard()
+	cpScope := &scope.ControlPlaneScope{
+		Client:       fakeClient,
+		Cluster:      cluster,
+		KwokCluster:  kwokCluster,
+		ControlPlane: controlPlane,
+		Logger:       &logger,
+	}
+
+	// Set POD_IP to simulate running inside a Kubernetes pod
+	t.Setenv("POD_IP", "10.244.0.5")
+
+	rt := &mockRuntime{}
+	svc := NewServiceWithProvider(cpScope, newMockProviderWithRuntime(rt))
+
+	clusterRef := types.NamespacedName{Name: "test-cluster", Namespace: "default"}
+	err := svc.createKubeconfigSecret(context.Background(), &clusterRef, rt)
+	g.Expect(err).NotTo(HaveOccurred())
+
+	// Verify the secret was created with pod IP instead of 127.0.0.1
+	secret := &corev1.Secret{}
+	err = fakeClient.Get(context.Background(), types.NamespacedName{
+		Name:      "test-cluster-kubeconfig",
+		Namespace: "default",
+	}, secret)
+	g.Expect(err).NotTo(HaveOccurred())
+
+	kubeconfigData := string(secret.Data["value"])
+	g.Expect(kubeconfigData).To(ContainSubstring("https://10.244.0.5:6443"))
+	g.Expect(kubeconfigData).NotTo(ContainSubstring("127.0.0.1"))
+
+	// Verify ControlPlaneEndpoint was set with pod IP
+	g.Expect(controlPlane.Spec.ControlPlaneEndpoint.Host).To(Equal("10.244.0.5"))
+	g.Expect(controlPlane.Spec.ControlPlaneEndpoint.Port).To(Equal(int32(6443)))
 }
 
 func TestCreateKubeconfigSecret_CreateFails(t *testing.T) {
