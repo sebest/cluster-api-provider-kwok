@@ -27,6 +27,10 @@ version::get_version_vars() {
         GIT_TREE_STATE="dirty"
     fi
 
+    # Initialize defaults
+    GIT_MAJOR="${GIT_MAJOR:-0}"
+    GIT_MINOR="${GIT_MINOR:-0}"
+
     # stolen from k8s.io/hack/lib/version.sh
     # Use git describe to find the version based on annotated tags.
     if [[ -n ${GIT_VERSION-} ]] || GIT_VERSION=$(git describe --abbrev=14 --match "v[0-9]*" 2>/dev/null); then
@@ -71,8 +75,11 @@ version::get_version_vars() {
         fi
     fi
 
-    GIT_RELEASE_TAG=$(git describe --abbrev=0 --tags)
-    GIT_RELEASE_COMMIT=$(git rev-list -n 1  "${GIT_RELEASE_TAG}")
+    # Fallback if git describe didn't find a version
+    GIT_VERSION="${GIT_VERSION:-v0.0.0}"
+
+    GIT_RELEASE_TAG=$(git describe --abbrev=0 --tags 2>/dev/null || echo "v0.0.0")
+    GIT_RELEASE_COMMIT=$(git rev-list -n 1  "${GIT_RELEASE_TAG}" 2>/dev/null || echo "${GIT_COMMIT}")
 }
 
 # stolen from k8s.io/hack/lib/version.sh and modified

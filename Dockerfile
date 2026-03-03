@@ -43,7 +43,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     -o manager ${package}
 
 COPY scripts/get-docker-cli.sh get-docker-cli.sh
-RUN ./get-docker-cli.sh ${ARCH} out
+RUN mkdir -p out && ./get-docker-cli.sh ${ARCH} out
 
 
 # Production image

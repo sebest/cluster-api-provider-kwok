@@ -36,7 +36,7 @@ helm install capkw charts/cluster-api-provider-kwok/ \
   --namespace capkw-system --create-namespace
 ```
 
-To customize the installation, override values:
+By default, the chart uses the image `docker.io/sebest/cluster-api-provider-kwok:dev`. To customize the installation, override values:
 
 ```sh
 helm install capkw charts/cluster-api-provider-kwok/ \
@@ -83,13 +83,15 @@ spec:
 
 ### CRD Reference
 
-| CRD | API Group | Description |
-|-----|-----------|-------------|
-| `KwokCluster` | `infrastructure.cluster.x-k8s.io` | Represents a simulated cluster's infrastructure |
-| `KwokMachine` | `infrastructure.cluster.x-k8s.io` | Represents a simulated machine/node |
-| `KwokMachineTemplate` | `infrastructure.cluster.x-k8s.io` | Template for creating KwokMachines |
-| `KwokControlPlane` | `controlplane.cluster.x-k8s.io` | Manages the simulated control plane |
-| `KwokConfig` | `bootstrap.cluster.x-k8s.io` | Bootstrap configuration for KWOK nodes |
+| CRD | API Group | Status | Description |
+|-----|-----------|--------|-------------|
+| `KwokCluster` | `infrastructure.cluster.x-k8s.io` | Active | Represents a simulated cluster's infrastructure |
+| `KwokMachine` | `infrastructure.cluster.x-k8s.io` | Not yet implemented | Represents a simulated machine/node |
+| `KwokMachineTemplate` | `infrastructure.cluster.x-k8s.io` | Not yet implemented | Template for creating KwokMachines |
+| `KwokControlPlane` | `controlplane.cluster.x-k8s.io` | Active | Manages the simulated control plane |
+| `KwokConfig` | `bootstrap.cluster.x-k8s.io` | Not yet implemented | Bootstrap configuration for KWOK nodes |
+
+> **Note:** Only `KwokCluster` and `KwokControlPlane` have active controllers. The CRDs for `KwokMachine`, `KwokMachineTemplate`, and `KwokConfig` are defined but their controllers are not yet enabled.
 
 ---
 
@@ -103,9 +105,14 @@ make managers
 
 ### Install CRDs
 
+CRD manifests must be generated before they can be applied. Either run code generation first:
+
 ```sh
+make generate-manifests
 kubectl apply -f config/crd/bases/
 ```
+
+Or use the Helm install (above), which bundles the CRDs automatically.
 
 ### Run the Controller Locally
 
@@ -134,6 +141,8 @@ make generate-go-deepcopy # deepcopy functions
 make test
 ```
 
+> **Note:** `make test` requires `setup-envtest`, which is not yet fully configured in the Makefile (the `SETUP_ENVTEST_BIN`, `SETUP_ENVTEST_VER`, and `SETUP_ENVTEST_PKG` variables are undefined). You can run unit tests directly with `go test ./...` instead.
+
 ### Docker Build
 
 ```sh
@@ -151,6 +160,8 @@ make tilt-up
 
 This creates a kind cluster and starts Tilt with live-reload for the provider.
 
+> **Note:** `make tilt-up` depends on `hack/kind-install-for-capd.sh`, which is not yet included in the repository. You may need to create a kind cluster manually before running `tilt up`.
+
 ### Make Targets
 
 | Target | Description |
@@ -167,11 +178,11 @@ This creates a kind cluster and starts Tilt with live-reload for the provider.
 
 ### Architecture
 
-The provider implements three Cluster API contracts:
+The provider currently implements two of the three Cluster API contracts:
 
-- **Infrastructure Provider** (`KwokCluster`, `KwokMachine`, `KwokMachineTemplate`) — manages simulated cluster infrastructure using KWOK runtimes (Docker Compose, kind, or binary)
+- **Infrastructure Provider** (`KwokCluster`) — manages simulated cluster infrastructure using KWOK runtimes (Docker Compose, kind, or binary). (`KwokMachine` and `KwokMachineTemplate` CRDs exist but their controllers are not yet enabled.)
 - **Control Plane Provider** (`KwokControlPlane`) — manages the simulated control plane lifecycle
-- **Bootstrap Provider** (`KwokConfig`) — handles node bootstrap configuration
+- **Bootstrap Provider** (`KwokConfig`) — CRD defined but controller not yet enabled
 
 Controllers watch Cluster API `Cluster` resources and reconcile the corresponding KWOK resources to simulate cluster lifecycle operations.
 

@@ -7,5 +7,5 @@ spec:
   template:
     spec:
       containers:
-        - image: ghcr.io/capi-samples/cluster-api-provider-kwok:dev
+        - image: docker.io/sebest/cluster-api-provider-kwok:dev
           name: manager

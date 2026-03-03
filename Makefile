@@ -109,8 +109,8 @@ GINKGO_PKG := github.com/onsi/ginkgo/v2/ginkgo
 # Registry / images
 TAG ?= dev
 ARCH ?= $(shell go env GOARCH)
-REGISTRY ?= ghcr.io
-ORG ?= capi-samples
+REGISTRY ?= docker.io
+ORG ?= sebest
 CONTROLLER_IMAGE_NAME := cluster-api-provider-kwok
 CONTROLLER_IMG ?= $(REGISTRY)/$(ORG)/$(CONTROLLER_IMAGE_NAME)
 ALL_ARCH = amd64 arm arm64
@@ -264,13 +264,13 @@ docker-pull-prerequisites:
 
 .PHONY: docker-build
 docker-build: docker-pull-prerequisites ## Build the docker image for controller-manager
-	DOCKER_BUILDKIT=1  docker build --pull --build-arg builder_image=$(GO_CONTAINER_IMAGE) --build-arg goproxy=$(GOPROXY) --build-arg ARCH=$(ARCH) --build-arg LDFLAGS="$(LDFLAGS)" . -t $(CONTROLLER_IMG)-$(ARCH):$(TAG)
-	MANIFEST_IMG=$(CONTROLLER_IMG)-$(ARCH) MANIFEST_TAG=$(TAG) $(MAKE) set-manifest-image
+	DOCKER_BUILDKIT=1  docker build --pull --build-arg builder_image=$(GO_CONTAINER_IMAGE) --build-arg goproxy=$(GOPROXY) --build-arg ARCH=$(ARCH) --build-arg LDFLAGS="$(LDFLAGS)" . -t $(CONTROLLER_IMG):$(TAG)
+	MANIFEST_IMG=$(CONTROLLER_IMG) MANIFEST_TAG=$(TAG) $(MAKE) set-manifest-image
 	$(MAKE) set-manifest-pull-policy
 
 .PHONY: docker-push
 docker-push: ## Push the docker image
-	docker push $(CONTROLLER_IMG)-$(ARCH):$(TAG)
+	docker push $(CONTROLLER_IMG):$(TAG)
 
 ##@ docker-all-arch:
 

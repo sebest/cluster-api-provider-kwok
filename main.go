@@ -122,7 +122,7 @@ func initFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&clusterConcurrency, "cluster-concurrency", 1,
 		"Number of cluster resources to process simultaneously")
 
-	fs.IntVar(&clusterConcurrency, "machine-concurrency", 1,
+	fs.IntVar(&machineConcurrency, "machine-concurrency", 1,
 		"Number of machine resources to process simultaneously")
 
 	fs.DurationVar(&syncPeriod, "sync-period", consts.DefaultSyncPeriod,
