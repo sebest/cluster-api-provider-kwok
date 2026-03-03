@@ -36,3 +36,33 @@ initialized when certain operations are performed. These warnings are cosmetic
 and do not affect functionality.
 
 **Workaround:** None needed. The warnings can be safely ignored.
+
+---
+
+## 3. Kind Cluster: Proxy Environment Variables Break Image Pulls
+
+**Status:** Fixed with `make kind-cluster`
+
+**Runtime:** kind (local development)
+
+**Symptom:** All pods fail with `ImagePullBackOff` and the kubelet logs show:
+```
+proxyconnect tcp: dial tcp [::1]:10054: connection refused
+```
+
+**Root cause:** When the host has `HTTP_PROXY`/`HTTPS_PROXY` set to a
+localhost address (e.g. `http://localhost:10054` from Docker Desktop or a
+corporate proxy), `kind create cluster` inherits those env vars into node
+containers. Inside the container, `localhost` refers to the container itself,
+not the host machine, so the proxy is unreachable and all image pulls fail.
+
+**Workaround:** Use `make kind-cluster` instead of `kind create cluster`
+directly. The `hack/kind-install.sh` script unsets proxy env vars before
+creating the cluster and cleans up any proxy that leaks in via the Docker
+daemon configuration.
+
+If creating clusters manually, unset proxy vars first:
+```bash
+unset HTTP_PROXY HTTPS_PROXY http_proxy https_proxy
+kind create cluster --name capi-test
+```

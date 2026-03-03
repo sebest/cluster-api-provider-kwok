@@ -119,7 +119,10 @@ ALL_ARCH = amd64 arm arm64
 LDFLAGS := $(shell  hack/version.sh)
 
 # Allow overriding the imagePullPolicy
-PULL_POLICY ?= Always
+PULL_POLICY ?= IfNotPresent
+
+# Kind cluster name for local development
+CAPI_KIND_CLUSTER_NAME ?= capi-test
 
 # Hosts running SELinux need :z added to volume mounts
 SELINUX_ENABLED := $(shell cat /sys/fs/selinux/enforce 2> /dev/null || echo 0)
@@ -272,6 +275,10 @@ docker-build: docker-pull-prerequisites ## Build the docker image for controller
 docker-push: ## Push the docker image
 	docker push $(CONTROLLER_IMG):$(TAG)
 
+.PHONY: kind-load
+kind-load: docker-build ## Build and load docker image into kind cluster
+	kind load docker-image $(CONTROLLER_IMG):$(TAG) --name $(CAPI_KIND_CLUSTER_NAME)
+
 ##@ docker-all-arch:
 
 .PHONY: docker-build-all ## Build all the architecture docker images
@@ -304,7 +311,7 @@ set-manifest-image:
 .PHONY: set-manifest-pull-policy
 set-manifest-pull-policy:
 	$(info Updating kustomize pull policy file for default resource)
-	
+	sed -i'' -e 's@imagePullPolicy: .*@imagePullPolicy: '"$(PULL_POLICY)"'@' ./config/default/manager_pull_policy.yaml
 
 
 ## --------------------------------------
@@ -330,8 +337,8 @@ test-cover: ## Run unit and integration tests and generate a coverage report
 	go tool cover -html=out/coverage.out -o out/coverage.html
 
 .PHONY: kind-cluster
-kind-cluster: ## Create a new kind cluster designed for development with Tilt
-	hack/kind-install-for-capd.sh
+kind-cluster: ## Create a new kind cluster with proxy workarounds for local dev
+	hack/kind-install.sh $(CAPI_KIND_CLUSTER_NAME)
 
 .PHONY: tilt-up
 tilt-up: kind-cluster ## Start tilt and build kind cluster if needed.
