@@ -7,14 +7,13 @@ import (
 	"time"
 
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/kwok/pkg/kwokctl/runtime"
 )
 
 func (s *Service) Delete(ctx context.Context) (ctrl.Result, error) {
 	logger := s.scope.Logger
 	logger.Info("Reconciling KwokControlPlane delete")
 
-	rt, err := runtime.DefaultRegistry.Load(ctx, s.scope.Name(), s.scope.WorkDir())
+	rt, err := s.runtimeProvider.Load(ctx, s.scope.Name(), s.scope.WorkDir())
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			logger.V(2).Info("Cluster does not exists, no action")

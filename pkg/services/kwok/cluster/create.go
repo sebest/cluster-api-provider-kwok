@@ -27,7 +27,7 @@ func (s *Service) Reconcile(ctx context.Context) (ctrl.Result, error) {
 	kwokctlConfiguration := config.GetKwokctlConfiguration(ctx)
 	kwokctlConfiguration.Options.Runtime = s.scope.Runtime()
 
-	buildRuntime, ok := runtime.DefaultRegistry.Get(s.scope.Runtime())
+	buildRuntime, ok := s.runtimeProvider.Get(s.scope.Runtime())
 	if !ok {
 		return ctrl.Result{}, fmt.Errorf("runtime %q not found", s.scope.Runtime())
 	}

@@ -5,11 +5,20 @@ import (
 )
 
 type Service struct {
-	scope *scope.ControlPlaneScope
+	scope           *scope.ControlPlaneScope
+	runtimeProvider RuntimeProvider
 }
 
 func NewService(scope *scope.ControlPlaneScope) *Service {
 	return &Service{
-		scope: scope,
+		scope:           scope,
+		runtimeProvider: &defaultRuntimeProvider{},
+	}
+}
+
+func NewServiceWithProvider(scope *scope.ControlPlaneScope, provider RuntimeProvider) *Service {
+	return &Service{
+		scope:           scope,
+		runtimeProvider: provider,
 	}
 }
