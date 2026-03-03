@@ -1,0 +1,14 @@
+apiVersion: v2
+name: cluster-api-provider-kwok
+description: A Cluster API infrastructure provider that uses KWOK to simulate Kubernetes clusters
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/capi-samples/cluster-api-provider-kwok
+sources:
+  - https://github.com/capi-samples/cluster-api-provider-kwok
+keywords:
+  - cluster-api
+  - kwok
+  - kubernetes
+  - simulation

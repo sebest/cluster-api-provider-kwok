@@ -1,0 +1,28 @@
+image:
+  repository: ghcr.io/capi-samples/cluster-api-provider-kwok
+  tag: dev
+  pullPolicy: Always
+
+replicaCount: 1
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 128Mi
+  requests:
+    cpu: 10m
+    memory: 64Mi
+
+leaderElect: true
+metricsBindAddr: "localhost:8080"
+healthAddr: ":9440"
+
+serviceAccount:
+  create: true
+  name: ""
+
+tolerations:
+  - effect: NoSchedule
+    key: node-role.kubernetes.io/master
+  - effect: NoSchedule
+    key: node-role.kubernetes.io/control-plane

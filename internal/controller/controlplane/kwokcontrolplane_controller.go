@@ -29,13 +29,13 @@ import (
 	"sigs.k8s.io/cluster-api/util/annotations"
 	"sigs.k8s.io/cluster-api/util/predicates"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	controlplanev1 "github.com/capi-samples/cluster-api-provider-kwok/api/controlplane/v1alpha1"
 	infrav1 "github.com/capi-samples/cluster-api-provider-kwok/api/infrastructure/v1alpha1"
@@ -191,36 +191,30 @@ func (r *KwokControlPlaneReconciler) SetupWithManager(ctx context.Context, mgr c
 	logger := log.FromContext(ctx)
 
 	controlPlane := &controlplanev1.KwokControlPlane{}
-	c, err := ctrl.NewControllerManagedBy(mgr).
+	_, err := ctrl.NewControllerManagedBy(mgr).
 		For(controlPlane).
 		WithOptions(options).
-		WithEventFilter(predicates.ResourceNotPausedAndHasFilterLabel(logger, r.WatchFilterValue)).
+		WithEventFilter(predicates.ResourceNotPausedAndHasFilterLabel(mgr.GetScheme(), logger, r.WatchFilterValue)).
+		Watches(
+			&clusterv1.Cluster{},
+			handler.EnqueueRequestsFromMapFunc(util.ClusterToInfrastructureMapFunc(ctx, controlPlane.GroupVersionKind(), mgr.GetClient(), &controlplanev1.KwokControlPlane{})),
+			builder.WithPredicates(predicates.ClusterUnpausedAndInfrastructureReady(mgr.GetScheme(), logger)),
+		).
+		Watches(
+			&infrav1.KwokCluster{},
+			handler.EnqueueRequestsFromMapFunc(r.kwokClusterToKwokControlPlane(ctx, &logger)),
+		).
 		Build(r)
 
 	if err != nil {
 		return fmt.Errorf("failed setting up the KwokControlPlane controller manager: %w", err)
 	}
 
-	if err = c.Watch(
-		&source.Kind{Type: &clusterv1.Cluster{}},
-		handler.EnqueueRequestsFromMapFunc(util.ClusterToInfrastructureMapFunc(ctx, controlPlane.GroupVersionKind(), mgr.GetClient(), &controlplanev1.KwokControlPlane{})),
-		predicates.ClusterUnpausedAndInfrastructureReady(logger),
-	); err != nil {
-		return fmt.Errorf("failed adding a watch for ready clusters: %w", err)
-	}
-
-	if err = c.Watch(
-		&source.Kind{Type: &infrav1.KwokCluster{}},
-		handler.EnqueueRequestsFromMapFunc(r.kwokClusterToKwokControlPlane(ctx, &logger)),
-	); err != nil {
-		return fmt.Errorf("failed adding a watch for KwokCluster")
-	}
-
 	return nil
 }
 
 func (r *KwokControlPlaneReconciler) kwokClusterToKwokControlPlane(ctx context.Context, logger *logr.Logger) handler.MapFunc {
-	return func(o client.Object) []ctrl.Request {
+	return func(_ context.Context, o client.Object) []ctrl.Request {
 		kwokCluster, ok := o.(*infrav1.KwokCluster)
 		if !ok {
 			logger.Error(fmt.Errorf("expected a KwokCluster but got a %T", o), "Expected KwokCluster")

@@ -29,17 +29,18 @@ import (
 	"github.com/spf13/pflag"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	"k8s.io/klog/v2"
-	"k8s.io/klog/v2/klogr"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	_ "sigs.k8s.io/kwok/pkg/kwokctl/runtime/binary"
 	_ "sigs.k8s.io/kwok/pkg/kwokctl/runtime/compose"
@@ -141,7 +142,7 @@ func main() {
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
 
-	ctrl.SetLogger(klogr.New())
+	ctrl.SetLogger(klog.NewKlogr())
 	ctx := ctrl.SetupSignalHandler()
 
 	if profilerAddress != "" {
@@ -153,17 +154,23 @@ func main() {
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:             scheme,
-		MetricsBindAddress: metricsBindAddr,
-		LeaderElection:     enableLeaderElection,
+		Scheme:         scheme,
+		Metrics:        metricsserver.Options{BindAddress: metricsBindAddr},
+		LeaderElection: enableLeaderElection,
 		LeaderElectionID:   "kwok-provider.cluster.x-k8s.io",
 		LeaseDuration:      &leaderElectionLeaseDuration,
 		RenewDeadline:      &leaderElectionRenewDeadline,
 		RetryPeriod:        &leaderElectionRetryPeriod,
-		SyncPeriod:         &syncPeriod,
-		ClientDisableCacheFor: []client.Object{
-			&corev1.Secret{},
-			&corev1.ConfigMap{},
+		Cache: cache.Options{
+			SyncPeriod: &syncPeriod,
+		},
+		Client: client.Options{
+			Cache: &client.CacheOptions{
+				DisableFor: []client.Object{
+					&corev1.Secret{},
+					&corev1.ConfigMap{},
+				},
+			},
 		},
 		HealthProbeBindAddress: healthAddr,
 		//Port
@@ -202,7 +209,7 @@ func setupReconcilers(ctx context.Context, mgr ctrl.Manager) {
 	if err := (&infracontroller.KwokClusterReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(ctx, mgr, controller.Options{MaxConcurrentReconciles: clusterConcurrency, RecoverPanic: pointer.Bool(true)}); err != nil {
+	}).SetupWithManager(ctx, mgr, controller.Options{MaxConcurrentReconciles: clusterConcurrency, RecoverPanic: ptr.To(true)}); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "KwokCluster")
 		os.Exit(1)
 	}
@@ -216,7 +223,7 @@ func setupReconcilers(ctx context.Context, mgr ctrl.Manager) {
 	if err := (&controlplanecontroller.KwokControlPlaneReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(ctx, mgr, controller.Options{MaxConcurrentReconciles: controlPlaneConcurrency, RecoverPanic: pointer.Bool(true)}); err != nil {
+	}).SetupWithManager(ctx, mgr, controller.Options{MaxConcurrentReconciles: controlPlaneConcurrency, RecoverPanic: ptr.To(true)}); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "KwokControlPlane")
 		os.Exit(1)
 	}

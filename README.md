@@ -1,84 +1,191 @@
-# cluster-api-provider-kwok
-// TODO(user): Add simple overview of use/purpose
+# Cluster API Provider KWOK
 
-## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+A [Cluster API](https://cluster-api.sigs.k8s.io/) infrastructure provider that uses [KWOK](https://kwok.sigs.k8s.io/) (Kubernetes WithOut Kubelet) to simulate Kubernetes clusters. This enables fast, lightweight cluster lifecycle testing without real nodes or cloud infrastructure.
 
-## Getting Started
-You’ll need a Kubernetes cluster to run against. You can use [KIND](https://sigs.k8s.io/kind) to get a local cluster for testing, or run against a remote cluster.
-**Note:** Your controller will automatically use the current context in your kubeconfig file (i.e. whatever cluster `kubectl cluster-info` shows).
+KWOK simulates Kubernetes nodes and pods without running actual kubelet processes, making it ideal for:
 
-### Running on the cluster
-1. Install Instances of Custom Resources:
+- **Testing Cluster API controllers** without cloud costs
+- **CI/CD pipelines** that need fast cluster provisioning
+- **Development** of Cluster API-based tooling
 
-```sh
-kubectl apply -f config/samples/
-```
+## Prerequisites
 
-2. Build and push your image to the location specified by `IMG`:
+- A Kubernetes cluster with [Cluster API](https://cluster-api.sigs.k8s.io/user/quick-start.html) installed (`clusterctl init`)
+- [Helm](https://helm.sh/) 3.x (for installation) or Go 1.24+ (for development)
+- Docker
+- kubectl
 
-```sh
-make docker-build docker-push IMG=<some-registry>/cluster-api-provider-kwok:tag
-```
+---
 
-3. Deploy the controller to the cluster with the image specified by `IMG`:
+## User Guide
 
-```sh
-make deploy IMG=<some-registry>/cluster-api-provider-kwok:tag
-```
+### Initialize Cluster API
 
-### Uninstall CRDs
-To delete the CRDs from the cluster:
+Before installing the provider, ensure the core Cluster API components are installed:
 
 ```sh
-make uninstall
+clusterctl init
 ```
 
-### Undeploy controller
-UnDeploy the controller from the cluster:
+This installs the core CRDs (`Cluster`, `Machine`, etc.) that the provider depends on.
+
+### Install with Helm
 
 ```sh
-make undeploy
+helm install capkw charts/cluster-api-provider-kwok/ \
+  --namespace capkw-system --create-namespace
 ```
 
-## Contributing
-// TODO(user): Add detailed information on how you would like others to contribute to this project
-
-### How it works
-This project aims to follow the Kubernetes [Operator pattern](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/).
-
-It uses [Controllers](https://kubernetes.io/docs/concepts/architecture/controller/),
-which provide a reconcile function responsible for synchronizing resources until the desired state is reached on the cluster.
-
-### Test It Out
-1. Install the CRDs into the cluster:
+To customize the installation, override values:
 
 ```sh
-make install
+helm install capkw charts/cluster-api-provider-kwok/ \
+  --namespace capkw-system --create-namespace \
+  --set image.tag=v0.1.0 \
+  --set image.pullPolicy=IfNotPresent
 ```
 
-2. Run your controller (this will run in the foreground, so switch to a new terminal if you want to leave it running):
+### Create a Simulated Cluster
+
+With Cluster API initialized and the provider installed, use the included cluster template:
 
 ```sh
-make run
+export CLUSTER_NAME=my-kwok-cluster
+clusterctl generate cluster ${CLUSTER_NAME} \
+  --from templates/cluster-template.yaml \
+  | kubectl apply -f -
 ```
 
-**NOTE:** You can also run this in one step by running: `make install run`
+This creates a `Cluster`, `KwokCluster`, and `KwokControlPlane`. The provider will simulate the full cluster lifecycle.
 
-### Modifying the API definitions
-If you are editing the API definitions, generate the manifests such as CRs or CRDs using:
+### Configuration
+
+#### Runtime Options
+
+The `KwokCluster` spec supports different runtimes via the `runtime` field:
+
+| Runtime | Description |
+|---------|-------------|
+| `docker` (default) | Uses Docker Compose to run KWOK components |
+| `kind` | Uses kind to run a simulated cluster |
+| `binary` | Runs KWOK components as local binaries |
+
+#### SimulationConfig
+
+All KWOK resources support a `simulationConfig` block for injecting latency into reconciliation:
+
+```yaml
+spec:
+  simulationConfig:
+    reconcile:
+      latency: "30s"
+```
+
+### CRD Reference
+
+| CRD | API Group | Description |
+|-----|-----------|-------------|
+| `KwokCluster` | `infrastructure.cluster.x-k8s.io` | Represents a simulated cluster's infrastructure |
+| `KwokMachine` | `infrastructure.cluster.x-k8s.io` | Represents a simulated machine/node |
+| `KwokMachineTemplate` | `infrastructure.cluster.x-k8s.io` | Template for creating KwokMachines |
+| `KwokControlPlane` | `controlplane.cluster.x-k8s.io` | Manages the simulated control plane |
+| `KwokConfig` | `bootstrap.cluster.x-k8s.io` | Bootstrap configuration for KWOK nodes |
+
+---
+
+## Developer Guide
+
+### Build
 
 ```sh
-make manifests
+make managers
 ```
 
-**NOTE:** Run `make --help` for more information on all potential `make` targets
+### Install CRDs
 
-More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
+```sh
+kubectl apply -f config/crd/bases/
+```
+
+### Run the Controller Locally
+
+```sh
+go run . --health-addr=:9440
+```
+
+### Code Generation
+
+Regenerate CRDs, RBAC manifests, and deepcopy functions after modifying API types:
+
+```sh
+make generate
+```
+
+Or run individual targets:
+
+```sh
+make generate-manifests   # CRD and RBAC manifests
+make generate-go-deepcopy # deepcopy functions
+```
+
+### Testing
+
+```sh
+make test
+```
+
+### Docker Build
+
+```sh
+make docker-build
+make docker-push
+```
+
+### Development with Tilt
+
+The project includes a `tilt-provider.json` for use with the upstream [Cluster API Tiltfile](https://cluster-api.sigs.k8s.io/developer/tilt.html). To set up a local development environment:
+
+```sh
+make tilt-up
+```
+
+This creates a kind cluster and starts Tilt with live-reload for the provider.
+
+### Make Targets
+
+| Target | Description |
+|--------|-------------|
+| `make managers` | Build the provider binary |
+| `make generate` | Run all code generation (manifests, deepcopy) |
+| `make generate-manifests` | Generate CRD and RBAC manifests |
+| `make generate-go-deepcopy` | Generate deepcopy functions |
+| `make test` | Run unit and integration tests |
+| `make lint` | Lint the codebase |
+| `make docker-build` | Build the Docker image |
+| `make docker-push` | Push the Docker image |
+| `make clean` | Remove generated binaries |
+
+### Architecture
+
+The provider implements three Cluster API contracts:
+
+- **Infrastructure Provider** (`KwokCluster`, `KwokMachine`, `KwokMachineTemplate`) — manages simulated cluster infrastructure using KWOK runtimes (Docker Compose, kind, or binary)
+- **Control Plane Provider** (`KwokControlPlane`) — manages the simulated control plane lifecycle
+- **Bootstrap Provider** (`KwokConfig`) — handles node bootstrap configuration
+
+Controllers watch Cluster API `Cluster` resources and reconcile the corresponding KWOK resources to simulate cluster lifecycle operations.
+
+#### Kustomize Deployment (alternative)
+
+The provider can also be deployed via kustomize instead of Helm:
+
+```sh
+kustomize build config/default | kubectl apply -f -
+```
 
 ## License
 
-Copyright 2023.
+Copyright 2023 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -91,4 +198,3 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-

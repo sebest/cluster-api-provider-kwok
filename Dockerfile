@@ -22,11 +22,6 @@ ENV GOPROXY=$goproxy
 # Copy the Go Modules manifests
 COPY go.mod go.mod
 COPY go.sum go.sum
-#RUN mkdir -p third_party/kwok/stages
-COPY third_party/kwok/go.mod third_party/kwok/go.mod
-COPY third_party/kwok/go.sum third_party/kwok/go.sum
-#COPY third_party/kwok/stages/*.yaml third_party/kwok/stages
-#RUN ls ./third_party/kwok/stages
 
 # Cache deps before building and copying source so that we don't need to re-download as much
 # and so that source changes don't invalidate our downloaded layer
@@ -53,7 +48,7 @@ RUN ./get-docker-cli.sh ${ARCH} out
 
 # Production image
 #FROM gcr.io/distroless/static:nonroot-${ARCH}
-FROM alpine:3.17
+FROM alpine:3.21
 
 RUN apk add --no-cache \
 		ca-certificates \
