@@ -20,7 +20,7 @@ import (
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 
 	sharedv1 "github.com/capi-samples/cluster-api-provider-kwok/api/shared/v1alpha1"
 )
@@ -66,7 +66,7 @@ type KwokClusterStatus struct {
 	Conditions clusterv1.Conditions `json:"conditions,omitempty"`
 
 	// FailureDomains is a list of the failure domains that CAPI should spread the machines across.
-	FailureDomains clusterv1.FailureDomains `json:"failureDomains,omitempty"`
+	FailureDomains []clusterv1.FailureDomain `json:"failureDomains,omitempty"`
 
 	// LastReconcileTime is the duration of the last reconcile loop.
 	//+optional

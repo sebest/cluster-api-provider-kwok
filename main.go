@@ -46,8 +46,7 @@ import (
 	_ "sigs.k8s.io/kwok/pkg/kwokctl/runtime/compose"
 	_ "sigs.k8s.io/kwok/pkg/kwokctl/runtime/kind"
 
-	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
-	expclusterv1 "sigs.k8s.io/cluster-api/exp/api/v1beta1"
+	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 
 	bootstrapv1 "github.com/capi-samples/cluster-api-provider-kwok/api/bootstrap/v1alpha1"
 	controlplanev1 "github.com/capi-samples/cluster-api-provider-kwok/api/controlplane/v1alpha1"
@@ -89,7 +88,6 @@ func init() {
 	utilruntime.Must(controlplanev1.AddToScheme(scheme))
 	utilruntime.Must(bootstrapv1.AddToScheme(scheme))
 	utilruntime.Must(clusterv1.AddToScheme(scheme))
-	utilruntime.Must(expclusterv1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 

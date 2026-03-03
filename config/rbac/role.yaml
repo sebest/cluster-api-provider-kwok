@@ -2,7 +2,6 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  creationTimestamp: null
   name: manager-role
 rules:
 - apiGroups:
@@ -55,15 +54,6 @@ rules:
 - apiGroups:
   - controlplane.cluster.x-k8s.io
   resources:
-  - kwokcontrolplanes
-  - kwokcontrolplanes/status
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - controlplane.cluster.x-k8s.io
-  resources:
   - kwokcontrolplanes/finalizers
   verbs:
   - update
@@ -73,16 +63,6 @@ rules:
   - kwokcontrolplanes/status
   verbs:
   - get
-  - patch
-  - update
-- apiGroups:
-  - infrastructure.cluster.x-k8s.io
-  resources:
-  - kwokclusters
-  verbs:
-  - create
-  - delete
-  - get
   - list
   - patch
   - update
@@ -90,20 +70,7 @@ rules:
 - apiGroups:
   - infrastructure.cluster.x-k8s.io
   resources:
-  - kwokclusters/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - infrastructure.cluster.x-k8s.io
-  resources:
-  - kwokclusters/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - infrastructure.cluster.x-k8s.io
-  resources:
+  - kwokclusters
   - kwokmachines
   verbs:
   - create
@@ -116,12 +83,14 @@ rules:
 - apiGroups:
   - infrastructure.cluster.x-k8s.io
   resources:
+  - kwokclusters/finalizers
   - kwokmachines/finalizers
   verbs:
   - update
 - apiGroups:
   - infrastructure.cluster.x-k8s.io
   resources:
+  - kwokclusters/status
   - kwokmachines/status
   verbs:
   - get

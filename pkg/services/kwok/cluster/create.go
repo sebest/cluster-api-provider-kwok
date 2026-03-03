@@ -125,7 +125,7 @@ func (s *Service) createKubeconfigSecret(ctx context.Context, clusterRef *types.
 	}
 	conf := &config.Options
 
-	controllerOwnerRef := *metav1.NewControllerRef(s.scope.ControlPlane, s.scope.Cluster.Spec.ControlPlaneRef.GroupVersionKind())
+	controllerOwnerRef := *metav1.NewControllerRef(s.scope.ControlPlane, s.scope.ControlPlane.GroupVersionKind())
 
 	clusterName := s.scope.Name()
 	userName := fmt.Sprintf("%s-capf-admin", clusterName)

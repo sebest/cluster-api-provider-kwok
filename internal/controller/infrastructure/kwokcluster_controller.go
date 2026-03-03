@@ -95,7 +95,7 @@ func (r *KwokClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	controlPlane := &controlplanev1.KwokControlPlane{}
 	controlPlaneRef := types.NamespacedName{
 		Name:      cluster.Spec.ControlPlaneRef.Name,
-		Namespace: cluster.Spec.ControlPlaneRef.Namespace,
+		Namespace: cluster.Namespace,
 	}
 
 	if err := r.Get(ctx, controlPlaneRef, controlPlane); err != nil {
@@ -203,8 +203,8 @@ func (r *KwokClusterReconciler) kwokControlPlaneToKwokCluster(ctx context.Contex
 		}
 
 		kwokClusterRef := cluster.Spec.InfrastructureRef
-		if kwokClusterRef == nil {
-			log.Info("InfrastructureRef is nil, skipping mapping")
+		if !kwokClusterRef.IsDefined() {
+			log.Info("InfrastructureRef is not defined, skipping mapping")
 			return nil
 		}
 
@@ -212,7 +212,7 @@ func (r *KwokClusterReconciler) kwokControlPlaneToKwokCluster(ctx context.Contex
 			{
 				NamespacedName: types.NamespacedName{
 					Name:      kwokClusterRef.Name,
-					Namespace: kwokClusterRef.Namespace,
+					Namespace: cluster.Namespace,
 				},
 			},
 		}

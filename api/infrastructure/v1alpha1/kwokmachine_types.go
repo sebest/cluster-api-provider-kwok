@@ -21,8 +21,7 @@ import (
 
 	sharedv1 "github.com/capi-samples/cluster-api-provider-kwok/api/shared/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
-	"sigs.k8s.io/cluster-api/errors"
+	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
 const (
@@ -46,18 +45,6 @@ type KwokMachineStatus struct {
 	// +optional
 	// +kubebuilder:default=false
 	Ready bool `json:"ready"`
-
-	// FailureReason will be set in the event that there is a terminal problem
-	// reconciling the Machine and will contain a succinct value suitable
-	// for machine interpretation.
-	// +optional
-	FailureReason *errors.MachineStatusError `json:"failureReason,omitempty"`
-
-	// FailureMessage will be set in the event that there is a terminal problem
-	// reconciling the Machine and will contain a more verbose string suitable
-	// for logging and human consumption.
-	// +optional
-	FailureMessage *string `json:"failureMessage,omitempty"`
 
 	// Conditions defines current service state of the MicrovmMachine.
 	// +optional

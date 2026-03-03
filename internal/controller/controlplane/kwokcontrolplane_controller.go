@@ -24,7 +24,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/cluster-api/util"
 	"sigs.k8s.io/cluster-api/util/annotations"
 	"sigs.k8s.io/cluster-api/util/predicates"
@@ -92,7 +92,7 @@ func (r *KwokControlPlaneReconciler) Reconcile(ctx context.Context, req ctrl.Req
 	kwokCluster := &infrav1.KwokCluster{}
 	kwokClusterRef := types.NamespacedName{
 		Name:      cluster.Spec.InfrastructureRef.Name,
-		Namespace: cluster.Spec.InfrastructureRef.Namespace,
+		Namespace: cluster.Namespace,
 	}
 
 	if err := r.Get(ctx, kwokClusterRef, kwokCluster); err != nil {
@@ -198,7 +198,7 @@ func (r *KwokControlPlaneReconciler) SetupWithManager(ctx context.Context, mgr c
 		Watches(
 			&clusterv1.Cluster{},
 			handler.EnqueueRequestsFromMapFunc(util.ClusterToInfrastructureMapFunc(ctx, controlPlane.GroupVersionKind(), mgr.GetClient(), &controlplanev1.KwokControlPlane{})),
-			builder.WithPredicates(predicates.ClusterUnpausedAndInfrastructureReady(mgr.GetScheme(), logger)),
+			builder.WithPredicates(predicates.ClusterUnpausedAndInfrastructureProvisioned(mgr.GetScheme(), logger)),
 		).
 		Watches(
 			&infrav1.KwokCluster{},
@@ -237,7 +237,7 @@ func (r *KwokControlPlaneReconciler) kwokClusterToKwokControlPlane(ctx context.C
 		}
 
 		controlPlaneRef := cluster.Spec.ControlPlaneRef
-		if controlPlaneRef == nil || controlPlaneRef.Kind != "KwokControlPlane" {
+		if !controlPlaneRef.IsDefined() || controlPlaneRef.Kind != "KwokControlPlane" {
 			logger.V(2).Info("ControlPlaneRef is nil or not KwokControlPlane, skipping mapping")
 			return nil
 		}
@@ -246,7 +246,7 @@ func (r *KwokControlPlaneReconciler) kwokClusterToKwokControlPlane(ctx context.C
 			{
 				NamespacedName: types.NamespacedName{
 					Name:      controlPlaneRef.Name,
-					Namespace: controlPlaneRef.Namespace,
+					Namespace: cluster.Namespace,
 				},
 			},
 		}

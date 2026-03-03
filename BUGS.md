@@ -36,19 +36,3 @@ initialized when certain operations are performed. These warnings are cosmetic
 and do not affect functionality.
 
 **Workaround:** None needed. The warnings can be safely ignored.
-
----
-
-## 3. Cluster API v1beta1 Deprecation
-
-**Status:** Technical debt
-
-**Symptom:** All Cluster API imports use the deprecated
-`sigs.k8s.io/cluster-api/api/v1beta1` package.
-
-**Impact:** Future versions of Cluster API will remove v1beta1. The provider
-should be migrated to the current stable API version when upgrading dependencies.
-
-**References:**
-- `sigs.k8s.io/cluster-api/api/v1beta1` (deprecated)
-- `sigs.k8s.io/cluster-api/exp/api/v1beta1` (deprecated)
