@@ -7,6 +7,18 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - nodes
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
   - secrets
   verbs:
   - create
@@ -46,6 +58,10 @@ rules:
   resources:
   - clusters
   - clusters/status
+  - machinepools
+  - machinepools/status
+  - machines
+  - machines/status
   verbs:
   - get
   - list
@@ -82,6 +98,7 @@ rules:
   - infrastructure.cluster.x-k8s.io
   resources:
   - kwokclusters
+  - kwokmachinepools
   - kwokmachines
   verbs:
   - create
@@ -95,6 +112,7 @@ rules:
   - infrastructure.cluster.x-k8s.io
   resources:
   - kwokclusters/finalizers
+  - kwokmachinepools/finalizers
   - kwokmachines/finalizers
   verbs:
   - update
@@ -102,6 +120,7 @@ rules:
   - infrastructure.cluster.x-k8s.io
   resources:
   - kwokclusters/status
+  - kwokmachinepools/status
   - kwokmachines/status
   verbs:
   - get

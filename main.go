@@ -79,6 +79,7 @@ var (
 	controlPlaneConcurrency int
 	clusterConcurrency      int
 	machineConcurrency      int
+	machinePoolConcurrency  int
 )
 
 func init() {
@@ -122,6 +123,9 @@ func initFlags(fs *pflag.FlagSet) {
 
 	fs.IntVar(&machineConcurrency, "machine-concurrency", 1,
 		"Number of machine resources to process simultaneously")
+
+	fs.IntVar(&machinePoolConcurrency, "machinepool-concurrency", 1,
+		"Number of machine pool resources to process simultaneously")
 
 	fs.DurationVar(&syncPeriod, "sync-period", consts.DefaultSyncPeriod,
 		"The minimum interval at which watched resources are reconciled (e.g. 15m)")
@@ -212,6 +216,8 @@ func setupProbes(mgr ctrl.Manager) {
 }
 
 func setupReconcilers(ctx context.Context, mgr ctrl.Manager) {
+	workloadClients := infracontroller.NewWorkloadClusterClientFactory(mgr.GetScheme())
+
 	if err := (&infracontroller.KwokClusterReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
@@ -219,13 +225,22 @@ func setupReconcilers(ctx context.Context, mgr ctrl.Manager) {
 		setupLog.Error(err, "unable to create controller", "controller", "KwokCluster")
 		os.Exit(1)
 	}
-	//if err := (&infracontroller.KwokMachineReconciler{
-	// 	Client: mgr.GetClient(),
-	// 	Scheme: mgr.GetScheme(),
-	// }).SetupWithManager(mgr); err != nil {
-	// 	setupLog.Error(err, "unable to create controller", "controller", "KwokMachine")
-	// 	os.Exit(1)
-	// }
+	if err := (&infracontroller.KwokMachineReconciler{
+		Client:          mgr.GetClient(),
+		Scheme:          mgr.GetScheme(),
+		WorkloadClients: workloadClients,
+	}).SetupWithManager(ctx, mgr, controller.Options{MaxConcurrentReconciles: machineConcurrency, RecoverPanic: ptr.To(true)}); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "KwokMachine")
+		os.Exit(1)
+	}
+	if err := (&infracontroller.KwokMachinePoolReconciler{
+		Client:          mgr.GetClient(),
+		Scheme:          mgr.GetScheme(),
+		WorkloadClients: workloadClients,
+	}).SetupWithManager(ctx, mgr, controller.Options{MaxConcurrentReconciles: machinePoolConcurrency, RecoverPanic: ptr.To(true)}); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "KwokMachinePool")
+		os.Exit(1)
+	}
 	if err := (&controlplanecontroller.KwokControlPlaneReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),

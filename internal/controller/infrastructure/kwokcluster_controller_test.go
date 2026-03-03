@@ -8,6 +8,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -21,6 +22,7 @@ import (
 
 func testScheme() *runtime.Scheme {
 	s := runtime.NewScheme()
+	_ = clientgoscheme.AddToScheme(s)
 	_ = clusterv1.AddToScheme(s)
 	_ = infrav1.AddToScheme(s)
 	_ = controlplanev1.AddToScheme(s)

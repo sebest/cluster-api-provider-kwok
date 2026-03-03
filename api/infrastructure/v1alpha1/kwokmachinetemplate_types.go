@@ -18,41 +18,38 @@ package v1alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
-// KwokMachineTemplateSpec defines the desired state of KwokMachineTemplate
+// KwokMachineTemplateSpec defines the desired state of KwokMachineTemplate.
 type KwokMachineTemplateSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
-	// Foo is an example field of KwokMachineTemplate. Edit kwokmachinetemplate_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// Template contains the KwokMachine template specification.
+	Template KwokMachineTemplateResource `json:"template"`
 }
 
-// KwokMachineTemplateStatus defines the observed state of KwokMachineTemplate
-type KwokMachineTemplateStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+// KwokMachineTemplateResource describes the data needed to create a KwokMachine from a template.
+type KwokMachineTemplateResource struct {
+	// Standard object's metadata.
+	// +optional
+	ObjectMeta clusterv1.ObjectMeta `json:"metadata,omitempty"`
+
+	// Spec is the specification of the desired behavior of the machine.
+	Spec KwokMachineSpec `json:"spec"`
 }
 
 //+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
 
-// KwokMachineTemplate is the Schema for the kwokmachinetemplates API
+// KwokMachineTemplate is the Schema for the kwokmachinetemplates API.
 type KwokMachineTemplate struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   KwokMachineTemplateSpec   `json:"spec,omitempty"`
-	Status KwokMachineTemplateStatus `json:"status,omitempty"`
+	Spec KwokMachineTemplateSpec `json:"spec,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 
-// KwokMachineTemplateList contains a list of KwokMachineTemplate
+// KwokMachineTemplateList contains a list of KwokMachineTemplate.
 type KwokMachineTemplateList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`

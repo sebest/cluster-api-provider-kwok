@@ -17,8 +17,6 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"time"
-
 	sharedv1 "github.com/capi-samples/cluster-api-provider-kwok/api/shared/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
@@ -29,36 +27,59 @@ const (
 	KwokMachineFinalizer = "kwokmachine.infrastructure.cluster.x-k8s.io"
 )
 
-// KwokMachineSpec defines the desired state of KwokMachine
+// KwokMachineSpec defines the desired state of KwokMachine.
 type KwokMachineSpec struct {
 	// ProviderID is the unique identifier as specified by the cloud provider.
-	ProviderID *string `json:"providerID,omitempty"`
+	// +optional
+	ProviderID string `json:"providerID,omitempty"`
 
 	// SimulationConfig holds the configuration options for changing the behavior of the simulation.
-	//+optional
+	// +optional
 	SimulationConfig *sharedv1.SimulationConfig `json:"simulationConfig,omitempty"`
 }
 
-// KwokMachineStatus defines the observed state of KwokMachine
+// KwokMachineStatus defines the observed state of KwokMachine.
 type KwokMachineStatus struct {
+	// Initialization provides observations of the KwokMachine initialization.
+	// +optional
+	Initialization KwokMachineInitializationStatus `json:"initialization,omitempty"`
+
+	// Addresses contains the associated addresses for the machine.
+	// +optional
+	Addresses []clusterv1.MachineAddress `json:"addresses,omitempty"`
+
+	// Conditions defines current service state of the KwokMachine.
+	// +optional
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
+
 	// Ready is true when the provider resource is ready.
 	// +optional
 	// +kubebuilder:default=false
 	Ready bool `json:"ready"`
+}
 
-	// Conditions defines current service state of the MicrovmMachine.
+// KwokMachineInitializationStatus provides observations of the KwokMachine initialization.
+type KwokMachineInitializationStatus struct {
+	// Provisioned is true when the infrastructure provider reports that the
+	// machine's infrastructure has been fully provisioned.
 	// +optional
-	Conditions clusterv1.Conditions `json:"conditions,omitempty"`
+	Provisioned *bool `json:"provisioned,omitempty"`
+}
 
-	// LastReconcileTime is the duration of the last reconcile loop.
-	//+optional
-	LastReconcileDuration time.Duration `json:"lastreconcileduration,omitempty"`
+// GetConditions returns the conditions for the KwokMachine.
+func (m *KwokMachine) GetConditions() []metav1.Condition {
+	return m.Status.Conditions
+}
+
+// SetConditions sets the conditions on the KwokMachine.
+func (m *KwokMachine) SetConditions(conditions []metav1.Condition) {
+	m.Status.Conditions = conditions
 }
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// KwokMachine is the Schema for the kwokmachines API
+// KwokMachine is the Schema for the kwokmachines API.
 type KwokMachine struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -69,7 +90,7 @@ type KwokMachine struct {
 
 //+kubebuilder:object:root=true
 
-// KwokMachineList contains a list of KwokMachine
+// KwokMachineList contains a list of KwokMachine.
 type KwokMachineList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
