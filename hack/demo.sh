@@ -149,6 +149,13 @@ run_cmd() {
   eval "$1" 2>&1 | sed 's/^/      /' || true
 }
 
+show_yaml() {
+  echo -e "\n    ${BOLD}Manifest:${RESET}"
+  echo -e "${DIM}"
+  echo "$1" | sed 's/^/      /'
+  echo -e "${RESET}"
+}
+
 check_stop() {
   local current_step="$1"
   if [[ "${STOP_AFTER}" -gt 0 && "${current_step}" -ge "${STOP_AFTER}" ]]; then
@@ -306,13 +313,16 @@ detail "  \"Cluster Controller has not yet set OwnerRef\""
 
 pause
 
-kubectl apply -f - <<EOF
+MANIFEST=$(cat <<EOF
 apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
 kind: KwokCluster
 metadata:
   name: ${WORKLOAD_CLUSTER_NAME}
 spec: {}
 EOF
+)
+show_yaml "$MANIFEST"
+echo "$MANIFEST" | kubectl apply -f -
 
 info "KwokCluster '${WORKLOAD_CLUSTER_NAME}' created"
 echo ""
@@ -335,13 +345,16 @@ detail "Like KwokCluster, it also waits for an owning Cluster before reconciling
 
 pause
 
-kubectl apply -f - <<EOF
+MANIFEST=$(cat <<EOF
 apiVersion: controlplane.cluster.x-k8s.io/v1alpha1
 kind: KwokControlPlane
 metadata:
   name: ${WORKLOAD_CLUSTER_NAME}-control-plane
 spec: {}
 EOF
+)
+show_yaml "$MANIFEST"
+echo "$MANIFEST" | kubectl apply -f -
 
 info "KwokControlPlane '${WORKLOAD_CLUSTER_NAME}-control-plane' created"
 echo ""
@@ -370,7 +383,7 @@ detail "  4. Cluster reaches Phase=Provisioned"
 
 pause
 
-kubectl apply -f - <<EOF
+MANIFEST=$(cat <<EOF
 apiVersion: cluster.x-k8s.io/v1beta2
 kind: Cluster
 metadata:
@@ -388,6 +401,9 @@ spec:
     kind: KwokControlPlane
     name: ${WORKLOAD_CLUSTER_NAME}-control-plane
 EOF
+)
+show_yaml "$MANIFEST"
+echo "$MANIFEST" | kubectl apply -f -
 
 info "CAPI Cluster '${WORKLOAD_CLUSTER_NAME}' created — reconciliation triggered!"
 echo ""
@@ -436,13 +452,16 @@ detail "It waits for an owning Machine or MachinePool before reconciling."
 
 pause
 
-kubectl apply -f - <<EOF
+MANIFEST=$(cat <<EOF
 apiVersion: bootstrap.cluster.x-k8s.io/v1alpha1
 kind: KwokConfig
 metadata:
   name: ${WORKLOAD_CLUSTER_NAME}-pool-0
 spec: {}
 EOF
+)
+show_yaml "$MANIFEST"
+echo "$MANIFEST" | kubectl apply -f -
 
 info "KwokConfig '${WORKLOAD_CLUSTER_NAME}-pool-0' created"
 echo ""
@@ -465,13 +484,16 @@ detail "Like the other infra resources, it waits for an owning MachinePool."
 
 pause
 
-kubectl apply -f - <<EOF
+MANIFEST=$(cat <<EOF
 apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
 kind: KwokMachinePool
 metadata:
   name: ${WORKLOAD_CLUSTER_NAME}-pool-0
 spec: {}
 EOF
+)
+show_yaml "$MANIFEST"
+echo "$MANIFEST" | kubectl apply -f -
 
 info "KwokMachinePool '${WORKLOAD_CLUSTER_NAME}-pool-0' created"
 echo ""
@@ -499,7 +521,7 @@ detail "  5. 3 Nodes appear Ready in the workload cluster"
 
 pause
 
-kubectl apply -f - <<EOF
+MANIFEST=$(cat <<EOF
 apiVersion: cluster.x-k8s.io/v1beta2
 kind: MachinePool
 metadata:
@@ -521,6 +543,9 @@ spec:
         kind: KwokMachinePool
         name: ${WORKLOAD_CLUSTER_NAME}-pool-0
 EOF
+)
+show_yaml "$MANIFEST"
+echo "$MANIFEST" | kubectl apply -f -
 
 info "CAPI MachinePool '${WORKLOAD_CLUSTER_NAME}-pool-0' created — machine lifecycle triggered!"
 echo ""
