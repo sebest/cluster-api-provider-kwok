@@ -333,6 +333,10 @@ kind-cluster: ## Create a new kind cluster with proxy workarounds for local dev
 e2e-test: ## Run end-to-end test (creates fresh kind cluster)
 	hack/e2e-test.sh
 
+.PHONY: demo
+demo: ## Run interactive demo (step-by-step CAPI resource lifecycle)
+	hack/demo.sh
+
 
 ## --------------------------------------
 ## Release
