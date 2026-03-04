@@ -120,9 +120,9 @@ func TestControlPlaneScope_Runtime(t *testing.T) {
 			expected: "docker",
 		},
 		{
-			name:     "empty defaults to docker",
+			name:     "empty defaults to kind",
 			runtime:  "",
-			expected: "docker",
+			expected: "kind",
 		},
 	}
 

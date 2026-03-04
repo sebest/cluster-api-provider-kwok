@@ -67,7 +67,7 @@ type ControlPlaneScope struct {
 func (s *ControlPlaneScope) Runtime() string {
 	runtime := s.KwokCluster.Spec.Runtime
 	if runtime == "" {
-		runtime = "docker"
+		runtime = "kind"
 	}
 
 	return runtime

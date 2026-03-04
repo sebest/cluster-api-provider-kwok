@@ -42,6 +42,25 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.uid
+        # Clear proxy env vars to prevent Docker Desktop proxy from leaking
+        # into child kind clusters (which causes containerd to crash).
+        - name: HTTP_PROXY
+          value: ""
+        - name: HTTPS_PROXY
+          value: ""
+        - name: http_proxy
+          value: ""
+        - name: https_proxy
+          value: ""
+        - name: NO_PROXY
+          value: ""
+        - name: no_proxy
+          value: ""
+        volumeMounts:
+        - name: docker-sock
+          mountPath: /var/run/docker.sock
+        - name: kwok-workdir
+          mountPath: /tmp/capf-kwok
         ports:
         - containerPort: 9440
           name: healthz
@@ -62,12 +81,19 @@ spec:
             cpu: 10m
             memory: 128Mi
         securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-              - "ALL"
+          runAsUser: 0
+          allowPrivilegeEscalation: true
       serviceAccountName: manager
       terminationGracePeriodSeconds: 10
+      volumes:
+      - name: docker-sock
+        hostPath:
+          path: /var/run/docker.sock
+          type: Socket
+      - name: kwok-workdir
+        hostPath:
+          path: /tmp/capf-kwok
+          type: DirectoryOrCreate
       tolerations:
         - effect: NoSchedule
           key: node-role.kubernetes.io/master

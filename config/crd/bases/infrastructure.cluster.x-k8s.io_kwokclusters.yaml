@@ -60,7 +60,7 @@ spec:
                     type: integer
                 type: object
               runtime:
-                default: binary
+                default: kind
                 description: Runtime is the kwok runtime to use.
                 type: string
               simulationConfig:
@@ -80,7 +80,7 @@ spec:
                     type: object
                 type: object
               workingDir:
-                default: /tmp/kwok
+                default: /tmp/capf-kwok
                 description: |-
                   WorkingDir is the directory to use for the kwok runtime. If using kind
                   you will need to mount this as an extra volume.

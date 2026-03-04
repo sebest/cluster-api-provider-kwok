@@ -17,7 +17,8 @@ bind mount is already pointing to a directory, and kube-apiserver fails to read
 them.
 
 **Workaround:** Use the `binary` runtime instead. Set `spec.runtime: binary` on
-the KwokCluster resource.
+the KwokCluster resource. Note: the default runtime is now `kind`, which avoids
+this issue entirely by using a separate kind cluster.
 
 ---
 

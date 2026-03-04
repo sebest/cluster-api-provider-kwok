@@ -465,6 +465,7 @@ users:
 		},
 		Spec: infrav1.KwokClusterSpec{
 			BindAddress: "10.0.0.5",
+			Runtime:     "binary",
 			WorkingDir:  workDir,
 		},
 	}
@@ -568,6 +569,7 @@ users:
 			Namespace: "default",
 		},
 		Spec: infrav1.KwokClusterSpec{
+			Runtime:    "binary",
 			WorkingDir: workDir,
 		},
 	}
@@ -667,6 +669,7 @@ users:
 			Namespace: "default",
 		},
 		Spec: infrav1.KwokClusterSpec{
+			Runtime:    "binary",
 			WorkingDir: workDir,
 		},
 	}

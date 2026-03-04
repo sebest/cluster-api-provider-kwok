@@ -45,6 +45,16 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 COPY scripts/get-docker-cli.sh get-docker-cli.sh
 RUN mkdir -p out && ./get-docker-cli.sh ${ARCH} out
 
+# Download kind binary
+ARG KIND_VERSION=v0.27.0
+RUN case "${ARCH}" in \
+      amd64) KIND_ARCH="amd64" ;; \
+      arm64) KIND_ARCH="arm64" ;; \
+      *) echo "unsupported arch ${ARCH}"; exit 1 ;; \
+    esac && \
+    wget -O out/kind "https://kind.sigs.k8s.io/dl/${KIND_VERSION}/kind-linux-${KIND_ARCH}" && \
+    chmod +x out/kind
+
 
 # Production image
 #FROM gcr.io/distroless/static:nonroot-${ARCH}
@@ -59,11 +69,12 @@ LABEL org.opencontainers.image.source=https://github.com/capi-samples/cluster-ap
 WORKDIR /
 COPY --from=builder /workspace/manager .
 COPY --from=builder /workspace/out/docker /usr/local/bin/docker
+COPY --from=builder /workspace/out/kind /usr/local/bin/kind
 
 RUN mkdir -p /usr/local/libexec/docker/cli-plugins
 COPY --from=builder /workspace/out/docker-compose /usr/local/libexec/docker/cli-plugins/docker-compose
-RUN docker --version && /usr/local/libexec/docker/cli-plugins/docker-compose --version
+RUN docker --version && /usr/local/libexec/docker/cli-plugins/docker-compose --version && kind --version
 
-# Use uid of nonroot user (65532) because kubernetes expects numeric user when applying pod security policies
-USER 65532
+# Run as root — Docker socket requires root access
+USER 0
 ENTRYPOINT ["/manager"]

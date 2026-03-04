@@ -63,7 +63,7 @@ spec:
         - name: docker-sock
           mountPath: /var/run/docker.sock
         - name: kwok-workdir
-          mountPath: /tmp/kwok
+          mountPath: /tmp/capf-kwok
         - name: kwok-cache
           mountPath: /tmp/.kwok
         {{- else }}
@@ -83,7 +83,7 @@ spec:
           type: Socket
       - name: kwok-workdir
         hostPath:
-          path: /tmp/kwok
+          path: /tmp/capf-kwok
           type: DirectoryOrCreate
       - name: kwok-cache
         hostPath:
