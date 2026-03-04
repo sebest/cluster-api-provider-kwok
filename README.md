@@ -19,31 +19,53 @@ KWOK simulates Kubernetes nodes and pods without running actual kubelet processe
 
 ## User Guide
 
-### Initialize Cluster API
+### Installation
 
-Before installing the provider, ensure the core Cluster API components are installed:
+1. **Initialize Cluster API** — install the core CRDs (`Cluster`, `Machine`, etc.) that the provider depends on:
+
+   ```sh
+   clusterctl init
+   ```
+
+2. **Install the KWOK provider with Helm:**
+
+   ```sh
+   helm install capkw charts/cluster-api-provider-kwok/ \
+     --namespace capkw-system --create-namespace
+   ```
+
+   To customize the installation, override values:
+
+   ```sh
+   helm install capkw charts/cluster-api-provider-kwok/ \
+     --namespace capkw-system --create-namespace \
+     --set image.tag=v0.1.0 \
+     --set image.pullPolicy=IfNotPresent
+   ```
+
+> **Note:** `clusterctl init` must be run before `helm install`. The Helm chart installs provider-specific CRDs (KwokCluster, KwokMachine, etc.) but the cluster template also uses core CAPI CRDs (Cluster, MachineDeployment) which are only available after `clusterctl init`.
+
+### Uninstall
 
 ```sh
-clusterctl init
+helm uninstall capkw --namespace capkw-system
 ```
 
-This installs the core CRDs (`Cluster`, `Machine`, etc.) that the provider depends on.
-
-### Install with Helm
+To also remove the namespace:
 
 ```sh
-helm install capkw charts/cluster-api-provider-kwok/ \
-  --namespace capkw-system --create-namespace
+kubectl delete namespace capkw-system
 ```
 
-By default, the chart uses the image `docker.io/sebest/cluster-api-provider-kwok:dev`. To customize the installation, override values:
-
-```sh
-helm install capkw charts/cluster-api-provider-kwok/ \
-  --namespace capkw-system --create-namespace \
-  --set image.tag=v0.1.0 \
-  --set image.pullPolicy=IfNotPresent
-```
+> **Note:** Helm does not delete CRDs on uninstall. To remove them manually:
+> ```sh
+> kubectl delete crd kwokcontrolplanes.controlplane.cluster.x-k8s.io \
+>   kwokclusters.infrastructure.cluster.x-k8s.io \
+>   kwokmachines.infrastructure.cluster.x-k8s.io \
+>   kwokmachinepools.infrastructure.cluster.x-k8s.io \
+>   kwokmachinetemplates.infrastructure.cluster.x-k8s.io \
+>   kwokconfigs.bootstrap.cluster.x-k8s.io
+> ```
 
 ### Create a Simulated Cluster
 

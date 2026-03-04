@@ -7,6 +7,36 @@ metadata:
     kwok.cluster.x-k8s.io/aggregate-to-manager: "true"
 rules:
 - apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+- apiGroups:
   - bootstrap.cluster.x-k8s.io
   resources:
   - kwokconfigs
@@ -37,6 +67,10 @@ rules:
   resources:
   - clusters
   - clusters/status
+  - machinepools
+  - machinepools/status
+  - machines
+  - machines/status
   verbs:
   - get
   - list
@@ -52,15 +86,6 @@ rules:
   - list
   - patch
   - update
-  - watch
-- apiGroups:
-  - controlplane.cluster.x-k8s.io
-  resources:
-  - kwokcontrolplanes
-  - kwokcontrolplanes/status
-  verbs:
-  - get
-  - list
   - watch
 - apiGroups:
   - controlplane.cluster.x-k8s.io
@@ -74,15 +99,16 @@ rules:
   - kwokcontrolplanes/status
   verbs:
   - get
+  - list
   - patch
   - update
+  - watch
 - apiGroups:
-  - infrastructure.cluster.x-k8s.io
+  - coordination.k8s.io
   resources:
-  - kwokclusters
+  - leases
   verbs:
   - create
-  - delete
   - get
   - list
   - patch
@@ -91,20 +117,8 @@ rules:
 - apiGroups:
   - infrastructure.cluster.x-k8s.io
   resources:
-  - kwokclusters/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - infrastructure.cluster.x-k8s.io
-  resources:
-  - kwokclusters/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - infrastructure.cluster.x-k8s.io
-  resources:
+  - kwokclusters
+  - kwokmachinepools
   - kwokmachines
   verbs:
   - create
@@ -117,30 +131,18 @@ rules:
 - apiGroups:
   - infrastructure.cluster.x-k8s.io
   resources:
+  - kwokclusters/finalizers
+  - kwokmachinepools/finalizers
   - kwokmachines/finalizers
   verbs:
   - update
 - apiGroups:
   - infrastructure.cluster.x-k8s.io
   resources:
+  - kwokclusters/status
+  - kwokmachinepools/status
   - kwokmachines/status
   verbs:
   - get
   - patch
   - update
-- apiGroups:
-  - ""
-  resources:
-  - secrets
-  verbs:
-  - create
-  - get
-  - list
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - events
-  verbs:
-  - create
-  - patch

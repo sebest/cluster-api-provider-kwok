@@ -44,6 +44,8 @@ KIND_CONFIG=$(mktemp)
 cat > "${KIND_CONFIG}" <<'KINDEOF'
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
+networking:
+  podSubnet: "10.244.0.0/16"
 nodes:
   - role: control-plane
     extraMounts:
@@ -51,6 +53,10 @@ nodes:
         containerPath: /var/run/docker.sock
       - hostPath: /tmp/capf-kwok
         containerPath: /tmp/capf-kwok
+    kubeadmConfigPatches:
+      - |
+        kind: KubeletConfiguration
+        maxPods: 500
 KINDEOF
 
 kind create cluster --name "${CLUSTER_NAME}" --config "${KIND_CONFIG}" --wait 5m

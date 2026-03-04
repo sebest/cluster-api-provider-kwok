@@ -1,0 +1,16 @@
+Thank you for installing {{ .Chart.Name }}!
+
+IMPORTANT: This provider requires the core Cluster API components (Cluster,
+Machine, MachineDeployment CRDs, etc.). If you haven't already, run:
+
+  clusterctl init
+
+Then create a simulated cluster:
+
+  export CLUSTER_NAME=my-kwok-cluster
+  clusterctl generate cluster ${CLUSTER_NAME} \
+    --from templates/cluster-template.yaml \
+    | kubectl apply -f -
+
+For more information, visit:
+  https://github.com/sebest/cluster-api-provider-kwok

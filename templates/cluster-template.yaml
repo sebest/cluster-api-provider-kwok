@@ -52,7 +52,7 @@ metadata:
   name: "${CLUSTER_NAME}-md-0"
 spec:
   clusterName: "${CLUSTER_NAME}"
-  replicas: ${WORKER_MACHINE_COUNT:=1}
+  replicas: ${WORKER_MACHINE_COUNT:=4}
   selector:
     matchLabels: {}
   template:

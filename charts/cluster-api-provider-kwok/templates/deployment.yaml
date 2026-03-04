@@ -38,10 +38,28 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.name
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
         - name: POD_UID
           valueFrom:
             fieldRef:
               fieldPath: metadata.uid
+        # Clear proxy env vars to prevent Docker Desktop proxy from leaking
+        # into child kind clusters (which causes containerd to crash).
+        - name: HTTP_PROXY
+          value: ""
+        - name: HTTPS_PROXY
+          value: ""
+        - name: http_proxy
+          value: ""
+        - name: https_proxy
+          value: ""
+        - name: NO_PROXY
+          value: ""
+        - name: no_proxy
+          value: ""
         ports:
         - containerPort: 9440
           name: healthz
@@ -56,26 +74,16 @@ spec:
             port: healthz
         resources:
           {{- toYaml .Values.resources | nindent 10 }}
-        {{- if .Values.dockerSocket.enabled }}
         securityContext:
           runAsUser: 0
+          allowPrivilegeEscalation: true
         volumeMounts:
         - name: docker-sock
           mountPath: /var/run/docker.sock
         - name: kwok-workdir
           mountPath: /tmp/capf-kwok
-        - name: kwok-cache
-          mountPath: /tmp/.kwok
-        {{- else }}
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-            - "ALL"
-        {{- end }}
       serviceAccountName: {{ include "cluster-api-provider-kwok.serviceAccountName" . }}
       terminationGracePeriodSeconds: 10
-      {{- if .Values.dockerSocket.enabled }}
       volumes:
       - name: docker-sock
         hostPath:
@@ -85,11 +93,6 @@ spec:
         hostPath:
           path: /tmp/capf-kwok
           type: DirectoryOrCreate
-      - name: kwok-cache
-        hostPath:
-          path: /tmp/.kwok
-          type: DirectoryOrCreate
-      {{- end }}
       {{- with .Values.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}

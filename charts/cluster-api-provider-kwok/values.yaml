@@ -7,20 +7,19 @@ replicaCount: 1
 
 resources:
   limits:
-    cpu: "1"
-    memory: 1Gi
+    cpu: 500m
+    memory: 512Mi
   requests:
-    cpu: 100m
-    memory: 256Mi
+    cpu: 10m
+    memory: 128Mi
 
 leaderElect: true
 metricsBindAddr: "localhost:8080"
 healthAddr: ":9440"
 
-# Mount the Docker socket from the host so the KWOK docker runtime
-# can create simulated clusters via Docker Compose.
+# Docker socket path on the host. Required for the kind and docker runtimes
+# to create sibling clusters via the host Docker daemon.
 dockerSocket:
-  enabled: true
   hostPath: /var/run/docker.sock
 
 serviceAccount:

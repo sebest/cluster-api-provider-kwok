@@ -60,8 +60,8 @@ spec:
             description: KwokConfigStatus defines the observed state of KwokConfig
             properties:
               dataSecretName:
-                description: DataSecretName is the name of the secret that stores the
-                  bootstrap data.
+                description: DataSecretName is the name of the secret that stores
+                  the bootstrap data.
                 type: string
               initialization:
                 description: Initialization provides observations of the KwokConfig
@@ -78,8 +78,9 @@ spec:
                 format: int64
                 type: integer
               ready:
-                description: Ready indicates the bootstrap data has been generated
-                  and the DataSecretName field is set.
+                description: |-
+                  Ready indicates the bootstrap data has been generated and the
+                  DataSecretName field is set.
                 type: boolean
             type: object
         type: object
