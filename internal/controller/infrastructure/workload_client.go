@@ -1,5 +1,5 @@
 /*
-Copyright 2023 The Kubernetes Authors..
+Copyright 2026 The Kubernetes Authors..
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,12 +19,15 @@ package controller
 import (
 	"context"
 	"fmt"
+	"net"
+	"strconv"
 	"sync"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/clientcmd"
+	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -45,8 +48,10 @@ func NewWorkloadClusterClientFactory(scheme *runtime.Scheme) *WorkloadClusterCli
 
 // GetClient returns a controller-runtime client for the workload cluster identified
 // by clusterName and namespace. It reads the <clusterName>-kubeconfig secret from the
-// management cluster and builds a client from it. Clients are cached per cluster.
-func (f *WorkloadClusterClientFactory) GetClient(ctx context.Context, mgmtClient client.Client, clusterName, namespace string) (client.Client, error) {
+// management cluster and builds a client from it. If endpoint is non-empty, the REST
+// config host is overridden (e.g. for kind runtime where the kubeconfig secret has
+// 127.0.0.1 but in-cluster access needs the container IP). Clients are cached per cluster.
+func (f *WorkloadClusterClientFactory) GetClient(ctx context.Context, mgmtClient client.Client, clusterName, namespace string, endpoint clusterv1.APIEndpoint) (client.Client, error) {
 	key := namespace + "/" + clusterName
 
 	f.mu.Lock()
@@ -74,6 +79,13 @@ func (f *WorkloadClusterClientFactory) GetClient(ctx context.Context, mgmtClient
 	restConfig, err := clientcmd.RESTConfigFromKubeConfig(kubeconfigData)
 	if err != nil {
 		return nil, fmt.Errorf("building REST config from kubeconfig: %w", err)
+	}
+
+	// Override the host if a ControlPlaneEndpoint is provided (e.g. for kind
+	// runtime where the kubeconfig has 127.0.0.1 but in-cluster access needs
+	// the workload container's IP).
+	if endpoint.Host != "" && endpoint.Port > 0 {
+		restConfig.Host = "https://" + net.JoinHostPort(endpoint.Host, strconv.Itoa(int(endpoint.Port)))
 	}
 
 	c, err := client.New(restConfig, client.Options{Scheme: f.scheme})

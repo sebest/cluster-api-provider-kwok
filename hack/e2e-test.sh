@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Copyright 2024 The Kubernetes Authors.
+# Copyright 2026 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -118,7 +118,10 @@ cleanup() {
   if [[ "${CLEANUP}" == "true" ]]; then
     step "Cleanup"
     kubectl delete cluster "${WORKLOAD_CLUSTER_NAME}" --ignore-not-found --timeout=60s 2>/dev/null || true
+    kind delete cluster --name "${WORKLOAD_CLUSTER_NAME}" 2>/dev/null || true
     kind delete cluster --name "${CLUSTER_NAME}" 2>/dev/null || true
+    rm -f "${MGMT_KUBECONFIG:-}" 2>/dev/null || true
+    rm -rf /tmp/capf-kwok 2>/dev/null || true
     info "Cleanup complete"
   else
     warn "Skipping cleanup (--no-cleanup). Kind cluster '${CLUSTER_NAME}' is still running."
@@ -131,6 +134,10 @@ step "Phase 1: Setup - Creating Kind cluster"
 
 # Delete any existing cluster
 kind delete cluster --name "${CLUSTER_NAME}" 2>/dev/null || true
+kind delete cluster --name "${WORKLOAD_CLUSTER_NAME}" 2>/dev/null || true
+
+# Clean shared kwok working directory to avoid stale data from previous runs
+rm -rf /tmp/capf-kwok
 
 # Create fresh kind cluster using the existing helper script
 "${ROOT_DIR}/hack/kind-install.sh" "${CLUSTER_NAME}"
@@ -139,6 +146,14 @@ kind delete cluster --name "${CLUSTER_NAME}" 2>/dev/null || true
 kubectl cluster-info --context "kind-${CLUSTER_NAME}" >/dev/null 2>&1 \
   || fail "Cannot reach kind cluster"
 info "Kind cluster '${CLUSTER_NAME}' is ready"
+
+# Save management cluster kubeconfig to a dedicated file. When the workload
+# kind cluster is created inside the controller, `kind create cluster`
+# overwrites the default kubeconfig context. Using an explicit kubeconfig
+# file avoids this problem.
+MGMT_KUBECONFIG=$(mktemp)
+kind get kubeconfig --name "${CLUSTER_NAME}" > "${MGMT_KUBECONFIG}"
+export KUBECONFIG="${MGMT_KUBECONFIG}"
 
 # Install CAPI core components
 step "Phase 1: Setup - Installing CAPI core components"
@@ -287,7 +302,8 @@ while true; do
 done
 info "3 CAPI Machines are Running - OK"
 
-# 4e. Verify kubeconfig secret exists and contains pod IP (not 127.0.0.1)
+# 4e. Verify kubeconfig secret exists and contains the container IP
+#      (not 127.0.0.1, since the secret is for in-cluster access)
 step "Phase 4: Verification - Kubeconfig"
 KUBECONFIG_SECRET="e2e-test-kubeconfig"
 kubectl get secret "${KUBECONFIG_SECRET}" >/dev/null 2>&1 \
@@ -296,20 +312,20 @@ info "Kubeconfig secret exists - OK"
 
 KUBECONFIG_DATA=$(kubectl get secret "${KUBECONFIG_SECRET}" -o jsonpath='{.data.value}' | base64 -d)
 if echo "${KUBECONFIG_DATA}" | grep -q "127\.0\.0\.1"; then
-  fail "Kubeconfig contains 127.0.0.1 instead of pod IP"
+  fail "Kubeconfig secret contains 127.0.0.1 — should use container IP for in-cluster access"
 fi
-info "Kubeconfig does not contain 127.0.0.1 - OK"
+info "Kubeconfig uses container IP (not 127.0.0.1) - OK"
 
-# 4f. Verify 3 nodes exist in the workload cluster (via kubectl exec into the controller pod,
-# since the kwok API server is only reachable from within the cluster network)
+# 4f. Verify 3 nodes exist in the workload cluster and are Ready
+#     (using kind get kubeconfig for Mac-side access via Docker port-mapping)
 step "Phase 4: Verification - Workload cluster nodes"
-CONTROLLER_POD=$(kubectl get pod -n capf-system -l control-plane=controller-manager -o jsonpath='{.items[0].metadata.name}')
+WORKLOAD_KUBECONFIG=$(mktemp)
+kind get kubeconfig --name "${WORKLOAD_CLUSTER_NAME}" > "${WORKLOAD_KUBECONFIG}"
 
 NODE_COUNT=0
 DEADLINE=$((SECONDS + TIMEOUT))
 while true; do
-  NODE_COUNT=$(kubectl exec -n capf-system "${CONTROLLER_POD}" -- \
-    /tmp/kwok/bin/kubectl --kubeconfig /tmp/kwok/kubeconfig.yaml get nodes --no-headers 2>/dev/null | wc -l | tr -d ' ') || true
+  NODE_COUNT=$(kubectl --kubeconfig "${WORKLOAD_KUBECONFIG}" get nodes --no-headers 2>/dev/null | wc -l | tr -d ' ') || true
   if [[ "${NODE_COUNT}" -ge 3 ]]; then
     break
   fi
@@ -319,6 +335,24 @@ while true; do
   sleep 2
 done
 info "Workload cluster has ${NODE_COUNT} nodes - OK"
+
+# 4g. Verify workload cluster nodes are Ready (not Unknown)
+info "Waiting for workload cluster nodes to be Ready..."
+DEADLINE=$((SECONDS + TIMEOUT))
+while true; do
+  READY_COUNT=$(kubectl --kubeconfig "${WORKLOAD_KUBECONFIG}" get nodes \
+    --no-headers 2>/dev/null \
+    | grep -c ' Ready' ) || true
+  if [[ "${READY_COUNT}" -ge 3 ]]; then
+    break
+  fi
+  if [[ ${SECONDS} -ge ${DEADLINE} ]]; then
+    CURRENT_NODES=$(kubectl --kubeconfig "${WORKLOAD_KUBECONFIG}" get nodes 2>/dev/null || true)
+    fail "Expected 3 Ready nodes, got:\n${CURRENT_NODES}"
+  fi
+  sleep 2
+done
+info "All ${READY_COUNT} workload cluster nodes are Ready - OK"
 
 # Show final state
 step "Final State"
@@ -339,8 +373,9 @@ echo "--- Machines ---"
 kubectl get machine -l cluster.x-k8s.io/cluster-name=e2e-test 2>/dev/null || true
 echo ""
 echo "--- Workload Cluster Nodes ---"
-kubectl exec -n capf-system "${CONTROLLER_POD}" -- \
-  /tmp/kwok/bin/kubectl --kubeconfig /tmp/kwok/kubeconfig.yaml get nodes 2>/dev/null || true
+kubectl --kubeconfig "${WORKLOAD_KUBECONFIG}" get nodes 2>/dev/null || true
+
+rm -f "${WORKLOAD_KUBECONFIG}"
 
 check_stop 4
 

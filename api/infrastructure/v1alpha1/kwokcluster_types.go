@@ -1,5 +1,5 @@
 /*
-Copyright 2023 The Kubernetes Authors..
+Copyright 2026 The Kubernetes Authors..
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -37,12 +37,12 @@ type KwokClusterSpec struct {
 	BindAddress string `json:"bindAddress,omitempty"`
 
 	// Runtime is the kwok runtime to use.
-	// +kubebuilder:default=binary
+	// +kubebuilder:default=kind
 	Runtime string `json:"runtime,omitempty"`
 
 	// WorkingDir is the directory to use for the kwok runtime. If using kind
 	// you will need to mount this as an extra volume.
-	// +kubebuilder:default=/tmp/kwok
+	// +kubebuilder:default=/tmp/capf-kwok
 	WorkingDir string `json:"workingDir,omitempty"`
 
 	// ControlPlaneEndpoint represents the endpoint used to communicate with the control plane.

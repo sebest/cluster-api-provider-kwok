@@ -1,5 +1,5 @@
 /*
-Copyright 2023 The Kubernetes Authors..
+Copyright 2026 The Kubernetes Authors..
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,8 +19,11 @@ package controller
 import (
 	"context"
 	"fmt"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	coordinationv1 "k8s.io/api/coordination/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -55,6 +58,7 @@ type KwokMachineReconciler struct {
 //+kubebuilder:rbac:groups=cluster.x-k8s.io,resources=machines;machines/status,verbs=get;list;watch
 //+kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
 //+kubebuilder:rbac:groups="",resources=nodes,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=coordination.k8s.io,resources=leases,verbs=get;list;watch;create;update;patch
 
 // Reconcile handles reconciliation of KwokMachine resources.
 func (r *KwokMachineReconciler) Reconcile(ctx context.Context, req ctrl.Request) (_ ctrl.Result, reterr error) {
@@ -133,11 +137,19 @@ func (r *KwokMachineReconciler) reconcileNormal(
 		log.Info("Added finalizer to KwokMachine")
 	}
 
-	// If ProviderID is already set, the machine is already provisioned
+	// If ProviderID is already set, the machine is already provisioned.
+	// Refresh the node heartbeat and lease to keep it Ready.
 	if kwokMachine.Spec.ProviderID != "" {
 		kwokMachine.Status.Initialization.Provisioned = ptr.To(true)
 		kwokMachine.Status.Ready = true
-		return reconcile.Result{}, nil
+
+		// Renew heartbeat on every requeue
+		if err := r.renewHeartbeat(ctx, cluster, kwokMachine); err != nil {
+			log.Error(err, "Failed to renew node heartbeat")
+			// Don't fail the reconcile — the node may not exist yet during initial provisioning race
+		}
+
+		return reconcile.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
 	// Wait for the bootstrap data to be available
@@ -147,14 +159,22 @@ func (r *KwokMachineReconciler) reconcileNormal(
 	}
 
 	// Get the workload cluster client
-	workloadClient, err := r.WorkloadClients.GetClient(ctx, r.Client, cluster.Name, cluster.Namespace)
+	workloadClient, err := r.WorkloadClients.GetClient(ctx, r.Client, cluster.Name, cluster.Namespace, cluster.Spec.ControlPlaneEndpoint)
 	if err != nil {
 		return reconcile.Result{}, fmt.Errorf("getting workload cluster client: %w", err)
+	}
+
+	// Determine kubelet version from Machine spec
+	kubeletVersion := "v1.31.0"
+	if machine.Spec.Version != "" {
+		kubeletVersion = machine.Spec.Version
 	}
 
 	// Create a Node object in the workload cluster
 	nodeName := machine.Name
 	providerID := fmt.Sprintf("kwok:////%s", nodeName)
+	now := metav1.Now()
+
 	node := &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: nodeName,
@@ -175,6 +195,83 @@ func (r *KwokMachineReconciler) reconcileNormal(
 			return reconcile.Result{}, fmt.Errorf("creating node %s in workload cluster: %w", nodeName, err)
 		}
 		log.Info("Node already exists in workload cluster", "node", nodeName)
+		// Fetch the existing node so we can update its status
+		if err := workloadClient.Get(ctx, client.ObjectKey{Name: nodeName}, node); err != nil {
+			return reconcile.Result{}, fmt.Errorf("getting existing node %s: %w", nodeName, err)
+		}
+	}
+
+	// Set node status (conditions, capacity, nodeInfo) via the status subresource
+	node.Status = corev1.NodeStatus{
+		Conditions: []corev1.NodeCondition{
+			{
+				Type:               corev1.NodeReady,
+				Status:             corev1.ConditionTrue,
+				LastHeartbeatTime:  now,
+				LastTransitionTime: now,
+				Reason:             "KwokNodeReady",
+				Message:            "kwok node is ready",
+			},
+			{
+				Type:               corev1.NodeMemoryPressure,
+				Status:             corev1.ConditionFalse,
+				LastHeartbeatTime:  now,
+				LastTransitionTime: now,
+				Reason:             "KwokNodeHasNoMemoryPressure",
+				Message:            "kwok node has no memory pressure",
+			},
+			{
+				Type:               corev1.NodeDiskPressure,
+				Status:             corev1.ConditionFalse,
+				LastHeartbeatTime:  now,
+				LastTransitionTime: now,
+				Reason:             "KwokNodeHasNoDiskPressure",
+				Message:            "kwok node has no disk pressure",
+			},
+			{
+				Type:               corev1.NodePIDPressure,
+				Status:             corev1.ConditionFalse,
+				LastHeartbeatTime:  now,
+				LastTransitionTime: now,
+				Reason:             "KwokNodeHasNoPIDPressure",
+				Message:            "kwok node has no PID pressure",
+			},
+			{
+				Type:               corev1.NodeNetworkUnavailable,
+				Status:             corev1.ConditionFalse,
+				LastHeartbeatTime:  now,
+				LastTransitionTime: now,
+				Reason:             "KwokNodeNetworkAvailable",
+				Message:            "kwok node network is available",
+			},
+		},
+		Capacity: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("8"),
+			corev1.ResourceMemory: resource.MustParse("32Gi"),
+			corev1.ResourcePods:   resource.MustParse("110"),
+		},
+		Allocatable: corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse("8"),
+			corev1.ResourceMemory: resource.MustParse("32Gi"),
+			corev1.ResourcePods:   resource.MustParse("110"),
+		},
+		NodeInfo: corev1.NodeSystemInfo{
+			KubeletVersion:          kubeletVersion,
+			OperatingSystem:         "linux",
+			Architecture:            "arm64",
+			ContainerRuntimeVersion: "kwok://fake",
+			KernelVersion:           "5.15.0-fake",
+			OSImage:                 "Fake KWOK OS",
+		},
+	}
+
+	if err := workloadClient.Status().Update(ctx, node); err != nil {
+		return reconcile.Result{}, fmt.Errorf("updating node %s status: %w", nodeName, err)
+	}
+
+	// Create or update the node lease for heartbeat simulation
+	if err := r.ensureNodeLease(ctx, workloadClient, nodeName); err != nil {
+		return reconcile.Result{}, fmt.Errorf("ensuring node lease for %s: %w", nodeName, err)
 	}
 
 	// Set the ProviderID
@@ -192,7 +289,100 @@ func (r *KwokMachineReconciler) reconcileNormal(
 
 	log.Info("Successfully provisioned KwokMachine", "providerID", providerID)
 
-	return reconcile.Result{}, nil
+	// Requeue to maintain heartbeat
+	return reconcile.Result{RequeueAfter: 30 * time.Second}, nil
+}
+
+// renewHeartbeat updates the node's Ready condition heartbeat time and the
+// node lease renew time to simulate kubelet heartbeats.
+func (r *KwokMachineReconciler) renewHeartbeat(
+	ctx context.Context,
+	cluster *clusterv1.Cluster,
+	kwokMachine *infrav1.KwokMachine,
+) error {
+	if kwokMachine.Spec.ProviderID == "" {
+		return nil
+	}
+
+	nodeName := kwokMachine.Spec.ProviderID[len("kwok:////"):]
+
+	workloadClient, err := r.WorkloadClients.GetClient(ctx, r.Client, cluster.Name, cluster.Namespace, cluster.Spec.ControlPlaneEndpoint)
+	if err != nil {
+		return fmt.Errorf("getting workload cluster client: %w", err)
+	}
+
+	now := metav1.Now()
+
+	// Update node conditions heartbeat time
+	node := &corev1.Node{}
+	if err := workloadClient.Get(ctx, client.ObjectKey{Name: nodeName}, node); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil // Node was deleted externally
+		}
+		return fmt.Errorf("getting node %s: %w", nodeName, err)
+	}
+
+	for i := range node.Status.Conditions {
+		node.Status.Conditions[i].LastHeartbeatTime = now
+	}
+
+	if err := workloadClient.Status().Update(ctx, node); err != nil {
+		return fmt.Errorf("updating node %s heartbeat: %w", nodeName, err)
+	}
+
+	// Update the lease
+	if err := r.ensureNodeLease(ctx, workloadClient, nodeName); err != nil {
+		return fmt.Errorf("updating lease for node %s: %w", nodeName, err)
+	}
+
+	return nil
+}
+
+// ensureNodeLease creates or updates a Lease object in the kube-node-lease
+// namespace to simulate kubelet heartbeats for the given node.
+func (r *KwokMachineReconciler) ensureNodeLease(ctx context.Context, workloadClient client.Client, nodeName string) error {
+	now := metav1.NewMicroTime(time.Now())
+	leaseDuration := int32(40)
+
+	lease := &coordinationv1.Lease{}
+	err := workloadClient.Get(ctx, client.ObjectKey{
+		Name:      nodeName,
+		Namespace: "kube-node-lease",
+	}, lease)
+
+	if apierrors.IsNotFound(err) {
+		// Create the lease
+		lease = &coordinationv1.Lease{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      nodeName,
+				Namespace: "kube-node-lease",
+			},
+			Spec: coordinationv1.LeaseSpec{
+				HolderIdentity:       ptr.To(nodeName),
+				LeaseDurationSeconds: ptr.To(leaseDuration),
+				RenewTime:            &now,
+			},
+		}
+		if err := workloadClient.Create(ctx, lease); err != nil {
+			if apierrors.IsAlreadyExists(err) {
+				// Race condition — someone else created it, just update
+				return r.ensureNodeLease(ctx, workloadClient, nodeName)
+			}
+			return fmt.Errorf("creating lease for node %s: %w", nodeName, err)
+		}
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("getting lease for node %s: %w", nodeName, err)
+	}
+
+	// Update existing lease
+	lease.Spec.RenewTime = &now
+	if err := workloadClient.Update(ctx, lease); err != nil {
+		return fmt.Errorf("updating lease for node %s: %w", nodeName, err)
+	}
+
+	return nil
 }
 
 func (r *KwokMachineReconciler) reconcileDelete(
@@ -204,7 +394,7 @@ func (r *KwokMachineReconciler) reconcileDelete(
 	log.Info("Handling KwokMachine deletion")
 
 	// Get the workload cluster client (best effort - cluster may already be gone)
-	workloadClient, err := r.WorkloadClients.GetClient(ctx, r.Client, cluster.Name, cluster.Namespace)
+	workloadClient, err := r.WorkloadClients.GetClient(ctx, r.Client, cluster.Name, cluster.Namespace, cluster.Spec.ControlPlaneEndpoint)
 	if err != nil {
 		log.Info("Could not get workload cluster client, cluster may already be deleted", "error", err)
 	} else {

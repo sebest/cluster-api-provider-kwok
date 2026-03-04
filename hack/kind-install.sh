@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Copyright 2023 The Kubernetes Authors.
+# Copyright 2026 The Kubernetes Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -34,7 +34,27 @@ echo "Creating kind cluster '${CLUSTER_NAME}'..."
 # Unset proxy env vars so kind doesn't inject them into nodes.
 unset HTTP_PROXY HTTPS_PROXY http_proxy https_proxy NO_PROXY no_proxy 2>/dev/null || true
 
-kind create cluster --name "${CLUSTER_NAME}" --wait 5m
+# Ensure shared working directory exists on the host
+mkdir -p /tmp/capf-kwok
+
+# Create kind config with extraMounts:
+# - Docker socket: lets the controller create sibling kind clusters
+# - /tmp/capf-kwok: shared working directory so kwok's bind mounts resolve correctly
+KIND_CONFIG=$(mktemp)
+cat > "${KIND_CONFIG}" <<'KINDEOF'
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane
+    extraMounts:
+      - hostPath: /var/run/docker.sock
+        containerPath: /var/run/docker.sock
+      - hostPath: /tmp/capf-kwok
+        containerPath: /tmp/capf-kwok
+KINDEOF
+
+kind create cluster --name "${CLUSTER_NAME}" --config "${KIND_CONFIG}" --wait 5m
+rm -f "${KIND_CONFIG}"
 
 # Detect and fix proxy inside the node if Docker daemon injected one.
 NODE="${CLUSTER_NAME}-control-plane"

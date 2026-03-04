@@ -1,5 +1,5 @@
 /*
-Copyright 2023 The Kubernetes Authors..
+Copyright 2026 The Kubernetes Authors..
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	clusterv1 "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
@@ -98,7 +99,7 @@ func TestGetWorkloadClusterClient(t *testing.T) {
 
 			factory := NewWorkloadClusterClientFactory(scheme)
 
-			_, err := factory.GetClient(context.Background(), fakeClient, tt.clusterName, tt.namespace)
+			_, err := factory.GetClient(context.Background(), fakeClient, tt.clusterName, tt.namespace, clusterv1.APIEndpoint{})
 			if tt.wantErr {
 				g.Expect(err).To(HaveOccurred())
 				if tt.errContains != "" {

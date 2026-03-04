@@ -1,4 +1,4 @@
-# Copyright 2023 The Kubernetes Authors..
+# Copyright 2026 The Kubernetes Authors..
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -247,17 +247,6 @@ docker-pull-prerequisites:
 	docker pull $(GO_CONTAINER_IMAGE)
 	docker pull gcr.io/distroless/static:latest
 
-# .PHONY: docker-build-all
-# docker-build-all: $(addprefix docker-build-,$(ALL_ARCH)) ## Build docker images for all architectures
-
-# docker-build-%:
-# 	$(MAKE) ARCH=$* docker-build
-
-# .PHONY: docker-build
-# docker-build: docker-pull-prerequisites ## Build the docker image for the kwok provider
-# 	DOCKER_BUILDKIT=1 docker build --build-arg builder_image=$(GO_CONTAINER_IMAGE) --build-arg goproxy=$(GOPROXY) --build-arg ARCH=$(ARCH) --build-arg package=. --build-arg ldflags="$(LDFLAGS)" . -t $(CONTROLLER_IMG)-$(ARCH):$(TAG)
-# 	$(MAKE) set-manifest-image MANIFEST_IMG=$(CONTROLLER_IMG)-$(ARCH) MANIFEST_TAG=$(TAG) TARGET_RESOURCE="./config/default/manager_image_patch.yaml"
-# 	$(MAKE) set-manifest-pull-policy TARGET_RESOURCE="./config/default/manager_pull_policy.yaml"
 
 ## --------------------------------------
 ## Docker
@@ -344,9 +333,6 @@ kind-cluster: ## Create a new kind cluster with proxy workarounds for local dev
 e2e-test: ## Run end-to-end test (creates fresh kind cluster)
 	hack/e2e-test.sh
 
-.PHONY: tilt-up
-tilt-up: kind-cluster ## Start tilt and build kind cluster if needed.
-	tilt up
 
 ## --------------------------------------
 ## Release
@@ -411,39 +397,6 @@ release-notes: $(RELEASE_DIR) $(GH)
 	$(GH) api repos/$(ORG)/$(GH_REPO_NAME)/releases/generate-notes -F tag_name=$(VERSION) -F previous_tag_name=$(PREVIOUS_VERSION) --jq '.body' > $(RELEASE_DIR)/CHANGELOG.md; \
 	fi
 
-## --------------------------------------
-## Docker
-## --------------------------------------
-
-# .PHONY: docker-push
-# docker-push: ## Push the docker images
-# 	docker push $(CONTROLER_IMG)-$(ARCH):$(TAG)
-
-# .PHONY: docker-push-all
-# docker-push-all: $(addprefix docker-push-,$(ALL_ARCH))  ## Push all the architecture docker images
-# 	$(MAKE) docker-push-manifest
-
-# docker-push-%:
-# 	$(MAKE) ARCH=$* docker-push
-
-# .PHONY: docker-push-manifest
-# docker-push-manifest: ## Push the multiarch manifest for the providers docker images
-# 	## Minimum docker version 18.06.0 is required for creating and pushing manifest images.
-# 	docker manifest create --amend $(CONTROLLER_IMG):$(TAG) $(shell echo $(ALL_ARCH) | sed -e "s~[^ ]*~$(CONTROLLER_IMG)\-&:$(TAG)~g")
-# 	@for arch in $(ALL_ARCH); do docker manifest annotate --arch $${arch} ${CONTROLLER_IMG}:${TAG} ${CONTROLLER_IMG}-$${arch}:${TAG}; done
-# 	docker manifest push --purge $(CONTROLLER_IMG):$(TAG)
-# 	## $(MAKE) set-manifest-image MANIFEST_IMG=$(CONTROLLER_IMG) MANIFEST_TAG=$(TAG) TARGET_RESOURCE="./config/default/manager_image_patch.yaml"
-# 	$(MAKE) set-manifest-pull-policy TARGET_RESOURCE="./config/default/manager_pull_policy.yaml"
-
-# .PHONY: set-manifest-pull-policy
-# set-manifest-pull-policy:
-# 	$(info Updating kustomize pull policy file for manager resources)
-# 	sed -i'' -e 's@imagePullPolicy: .*@imagePullPolicy: '"$(PULL_POLICY)"'@' $(TARGET_RESOURCE)
-
-# .PHONY: set-manifest-image
-# set-manifest-image:
-# 	$(info Updating kustomize image patch file for manager resource)
-# 	sed -i'' -e 's@image: .*@image: '"${MANIFEST_IMG}:$(MANIFEST_TAG)"'@' $(TARGET_RESOURCE)
 
 ## --------------------------------------
 ## Cleanup / Verification

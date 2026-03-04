@@ -86,12 +86,11 @@ spec:
 | CRD | API Group | Status | Description |
 |-----|-----------|--------|-------------|
 | `KwokCluster` | `infrastructure.cluster.x-k8s.io` | Active | Represents a simulated cluster's infrastructure |
-| `KwokMachine` | `infrastructure.cluster.x-k8s.io` | Not yet implemented | Represents a simulated machine/node |
-| `KwokMachineTemplate` | `infrastructure.cluster.x-k8s.io` | Not yet implemented | Template for creating KwokMachines |
+| `KwokMachine` | `infrastructure.cluster.x-k8s.io` | Active | Represents a simulated machine/node |
+| `KwokMachinePool` | `infrastructure.cluster.x-k8s.io` | Active | Represents a pool of simulated machines |
+| `KwokMachineTemplate` | `infrastructure.cluster.x-k8s.io` | Active | Template for creating KwokMachines (used by MachineDeployments) |
 | `KwokControlPlane` | `controlplane.cluster.x-k8s.io` | Active | Manages the simulated control plane |
-| `KwokConfig` | `bootstrap.cluster.x-k8s.io` | Not yet implemented | Bootstrap configuration for KWOK nodes |
-
-> **Note:** Only `KwokCluster` and `KwokControlPlane` have active controllers. The CRDs for `KwokMachine`, `KwokMachineTemplate`, and `KwokConfig` are defined but their controllers are not yet enabled.
+| `KwokConfig` | `bootstrap.cluster.x-k8s.io` | Active | Bootstrap configuration for KWOK nodes |
 
 ---
 
@@ -143,24 +142,26 @@ make test
 
 > **Note:** `make test` requires `setup-envtest`, which is not yet fully configured in the Makefile (the `SETUP_ENVTEST_BIN`, `SETUP_ENVTEST_VER`, and `SETUP_ENVTEST_PKG` variables are undefined). You can run unit tests directly with `go test ./...` instead.
 
+#### End-to-End Tests
+
+Run the full end-to-end test suite, which creates a fresh kind cluster, installs Cluster API and the provider, applies a cluster template, and validates the entire lifecycle:
+
+```sh
+make e2e-test
+```
+
+You can also create a kind cluster for manual testing:
+
+```sh
+make kind-cluster
+```
+
 ### Docker Build
 
 ```sh
 make docker-build
 make docker-push
 ```
-
-### Development with Tilt
-
-The project includes a `tilt-provider.json` for use with the upstream [Cluster API Tiltfile](https://cluster-api.sigs.k8s.io/developer/tilt.html). To set up a local development environment:
-
-```sh
-make tilt-up
-```
-
-This creates a kind cluster and starts Tilt with live-reload for the provider.
-
-> **Note:** `make tilt-up` depends on `hack/kind-install-for-capd.sh`, which is not yet included in the repository. You may need to create a kind cluster manually before running `tilt up`.
 
 ### Make Targets
 
@@ -171,18 +172,23 @@ This creates a kind cluster and starts Tilt with live-reload for the provider.
 | `make generate-manifests` | Generate CRD and RBAC manifests |
 | `make generate-go-deepcopy` | Generate deepcopy functions |
 | `make test` | Run unit and integration tests |
+| `make e2e-test` | Run end-to-end tests |
 | `make lint` | Lint the codebase |
 | `make docker-build` | Build the Docker image |
 | `make docker-push` | Push the Docker image |
+| `make kind-cluster` | Create a kind cluster for local development |
+| `make kind-load` | Build and load Docker image into kind |
 | `make clean` | Remove generated binaries |
 
 ### Architecture
 
-The provider currently implements two of the three Cluster API contracts:
+The provider implements all three Cluster API contracts:
 
-- **Infrastructure Provider** (`KwokCluster`) — manages simulated cluster infrastructure using KWOK runtimes (Docker Compose, kind, or binary). (`KwokMachine` and `KwokMachineTemplate` CRDs exist but their controllers are not yet enabled.)
+- **Infrastructure Provider** (`KwokCluster`, `KwokMachine`, `KwokMachinePool`, `KwokMachineTemplate`) — manages simulated cluster infrastructure using KWOK runtimes (Docker Compose, kind, or binary) and simulated machine lifecycle
 - **Control Plane Provider** (`KwokControlPlane`) — manages the simulated control plane lifecycle
-- **Bootstrap Provider** (`KwokConfig`) — CRD defined but controller not yet enabled
+- **Bootstrap Provider** (`KwokConfig`) — generates bootstrap data for simulated nodes
+
+Since the kwok-controller cannot run inside the workload cluster with the kind runtime, the provider simulates kubelet heartbeats by periodically updating node conditions and coordinated leases on the workload cluster.
 
 Controllers watch Cluster API `Cluster` resources and reconcile the corresponding KWOK resources to simulate cluster lifecycle operations.
 
@@ -196,7 +202,7 @@ kustomize build config/default | kubectl apply -f -
 
 ## License
 
-Copyright 2023 The Kubernetes Authors.
+Copyright 2026 The Kubernetes Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
